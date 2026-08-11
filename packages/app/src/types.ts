@@ -2,7 +2,13 @@
  * 型定義のみ。実行時コードを置かないこと。
  * このファイルは coverage.exclude の許可リストに含まれる。
  */
-import type { AuthRepository, EventStore, UserRepository, UserRow } from '@test/core';
+import type {
+  AuthRepository,
+  EventStore,
+  RequestRepository,
+  UserRepository,
+  UserRow,
+} from '@test/core';
 
 /**
  * ハンドラが必要とする操作だけを構造的に切り出したもの。
@@ -10,7 +16,12 @@ import type { AuthRepository, EventStore, UserRepository, UserRow } from '@test/
  */
 export type UsersPort = Pick<
   UserRepository,
-  'create' | 'findById' | 'list' | 'updateStatus' | 'deleteById'
+  'create' | 'findById' | 'list' | 'updateStatus' | 'deleteById' | 'countAll'
+>;
+
+export type RequestsPort = Pick<
+  RequestRepository,
+  'create' | 'findById' | 'list' | 'submit' | 'decide' | 'countByStatus'
 >;
 
 export type AuthPort = Pick<
@@ -25,6 +36,7 @@ export interface Deps {
   users: UsersPort;
   auth: AuthPort;
   events: EventsPort;
+  requests: RequestsPort;
 }
 
 /** 認証ミドルウェアが c.set する値。 */

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '../api.ts';
+import { Mark } from '../components/AppShell.tsx';
 import { toMessage } from '../error-message.ts';
 
 export function LoginPage() {
@@ -17,7 +18,7 @@ export function LoginPage() {
     setError(null);
     try {
       await api.login(email, password);
-      navigate('/users');
+      navigate('/');
     } catch (caught) {
       setError(toMessage(caught));
     } finally {
@@ -26,33 +27,50 @@ export function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>ログイン</h1>
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="email">メールアドレス</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+    <div className="signin">
+      <div className="signin__card">
+        <div className="signin__brand">
+          <Mark />
+          <span>オペレーション基盤</span>
+        </div>
 
-        <label htmlFor="password">パスワード</label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <h1 className="signin__title">ログイン</h1>
+        <p className="signin__lead">社内アカウントで続けます。</p>
 
-        <button type="submit" disabled={busy}>
-          ログイン
-        </button>
-      </form>
+        {error !== null && (
+          <p className="alert" role="alert">
+            {error}
+          </p>
+        )}
 
-      {error !== null && <p role="alert">{error}</p>}
-    </main>
+        <form className="form" onSubmit={handleSubmit}>
+          <div className="field">
+            <label htmlFor="email">メールアドレス</label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="password">パスワード</label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          <button type="submit" className="btn btn--primary" disabled={busy}>
+            ログイン
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

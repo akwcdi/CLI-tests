@@ -15,12 +15,18 @@ export {
   isSessionExpired,
   sessionExpiresAt,
 } from './session.ts';
+export { RequestRepository, RequestNotFoundError } from './request-repository.ts';
+export { canTransitionRequest, isDecided, validateNewRequest } from './request.ts';
 export { UserRepository, UserNotFoundError, type Queryable } from './user-repository.ts';
 export { ValidationError, canTransition, normalizeEmail, validateNewUser } from './user.ts';
 export type {
   EventItem,
+  NewRequest,
   NewUser,
   Page,
+  RequestRow,
+  RequestStatus,
+  RequestWithNames,
   SessionRow,
   UserCredentials,
   UserRow,

@@ -51,3 +51,31 @@ export interface Page<T> {
   items: T[];
   nextCursor: string | null;
 }
+
+/** 申請の状態。approved / rejected は終端。 */
+export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
+/** requests テーブルの1行。 */
+export interface RequestRow {
+  id: string;
+  title: string;
+  amount: number;
+  status: RequestStatus;
+  requester_id: string;
+  decided_by: string | null;
+  created_at: Date;
+  decided_at: Date | null;
+}
+
+/** 一覧表示用に申請者名を添えた行。 */
+export interface RequestWithNames extends RequestRow {
+  requester_name: string;
+  decider_name: string | null;
+}
+
+/** 申請の新規作成入力。 */
+export interface NewRequest {
+  title: string;
+  amount: number;
+  requesterId: string;
+}

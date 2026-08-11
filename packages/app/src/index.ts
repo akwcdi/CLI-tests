@@ -8,6 +8,7 @@
 export { createApp } from './app.ts';
 export { describeError, UnauthorizedError, type HttpError } from './errors.ts';
 export { EVENT_TYPES, recordEvent, type EventType } from './events.ts';
+export { readAmount, readDecision, readRequestStatus } from './request.ts';
 export { createDeps } from './db.ts';
 export { appConfig } from './config.ts';
 export type {
@@ -17,5 +18,6 @@ export type {
   Deps,
   ErrorBody,
   EventsPort,
+  RequestsPort,
   UsersPort,
 } from './types.ts';

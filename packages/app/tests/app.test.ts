@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { hashPassword, UserNotFoundError, ValidationError, type UserRow } from '@test/core';
 
 import { createApp } from '../src/app.ts';
-import type { AuthPort, Deps, EventsPort, UsersPort } from '../src/types.ts';
+import type { AuthPort, Deps, EventsPort, RequestsPort, UsersPort } from '../src/types.ts';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_ID = '22222222-2222-4222-8222-222222222222';
@@ -27,6 +27,7 @@ function createDeps() {
     list: vi.fn<UsersPort['list']>(),
     updateStatus: vi.fn<UsersPort['updateStatus']>(),
     deleteById: vi.fn<UsersPort['deleteById']>(),
+    countAll: vi.fn<UsersPort['countAll']>(),
   };
   const auth = {
     findCredentialsByEmail: vi.fn<AuthPort['findCredentialsByEmail']>(),
@@ -38,8 +39,16 @@ function createDeps() {
     append: vi.fn<EventsPort['append']>(),
     listByUser: vi.fn<EventsPort['listByUser']>(),
   };
-  const deps: Deps = { users, auth, events };
-  return { deps, users, auth, events, app: createApp(deps) };
+  const requests = {
+    create: vi.fn<RequestsPort['create']>(),
+    findById: vi.fn<RequestsPort['findById']>(),
+    list: vi.fn<RequestsPort['list']>(),
+    submit: vi.fn<RequestsPort['submit']>(),
+    decide: vi.fn<RequestsPort['decide']>(),
+    countByStatus: vi.fn<RequestsPort['countByStatus']>(),
+  };
+  const deps: Deps = { users, auth, events, requests };
+  return { deps, users, auth, events, requests, app: createApp(deps) };
 }
 
 /** 認証済みリクエスト用のヘッダ。 */

@@ -1,4 +1,9 @@
-import { InvalidCursorError, UserNotFoundError, ValidationError } from '@test/core';
+import {
+  InvalidCursorError,
+  RequestNotFoundError,
+  UserNotFoundError,
+  ValidationError,
+} from '@test/core';
 
 import type { ErrorBody } from './types.ts';
 
@@ -32,7 +37,7 @@ export function describeError(error: unknown): HttpError {
   if (error instanceof UnauthorizedError) {
     return { status: 401, body: { error: { code: 'unauthorized', message: error.message } } };
   }
-  if (error instanceof UserNotFoundError) {
+  if (error instanceof UserNotFoundError || error instanceof RequestNotFoundError) {
     return { status: 404, body: { error: { code: 'not_found', message: error.message } } };
   }
   return {

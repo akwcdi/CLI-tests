@@ -1,4 +1,13 @@
-import type { ApiErrorBody, Page, User, UserEvent, UserStatus } from './types.ts';
+import type {
+  ApiErrorBody,
+  ApprovalRequest,
+  Overview,
+  Page,
+  RequestStatus,
+  User,
+  UserEvent,
+  UserStatus,
+} from './types.ts';
 
 /** API がエラー応答を返したときに投げられる。画面はこの message を出す。 */
 export class ApiError extends Error {
@@ -93,5 +102,58 @@ export const api = {
 
   listEvents(id: string): Promise<Page<UserEvent>> {
     return request<Page<UserEvent>>(`/api/users/${id}/events`);
+  },
+
+  overview(): Promise<Overview> {
+    return request<Overview>('/api/overview');
+  },
+
+  listRequests(
+    options: { limit?: number; cursor?: string | null; status?: RequestStatus } = {},
+  ): Promise<Page<ApprovalRequest>> {
+    const query = new URLSearchParams();
+    if (options.limit !== undefined) {
+      query.set('limit', String(options.limit));
+    }
+    if (options.cursor !== undefined && options.cursor !== null) {
+      query.set('cursor', options.cursor);
+    }
+    if (options.status !== undefined) {
+      query.set('status', options.status);
+    }
+    const suffix = query.size === 0 ? '' : `?${query.toString()}`;
+    return request<Page<ApprovalRequest>>(`/api/requests${suffix}`);
+  },
+
+  async createRequest(input: { title: string; amount: number }): Promise<ApprovalRequest> {
+    const body = await request<{ request: ApprovalRequest }>(
+      '/api/requests',
+      jsonInit('POST', input),
+    );
+    return body.request;
+  },
+
+  async getRequest(id: string): Promise<ApprovalRequest> {
+    const body = await request<{ request: ApprovalRequest }>(`/api/requests/${id}`);
+    return body.request;
+  },
+
+  async submitRequest(id: string): Promise<ApprovalRequest> {
+    const body = await request<{ request: ApprovalRequest }>(`/api/requests/${id}/submit`, {
+      method: 'POST',
+    });
+    return body.request;
+  },
+
+  async decideRequest(id: string, decision: 'approved' | 'rejected'): Promise<ApprovalRequest> {
+    const body = await request<{ request: ApprovalRequest }>(
+      `/api/requests/${id}/decision`,
+      jsonInit('POST', { decision }),
+    );
+    return body.request;
+  },
+
+  listRequestEvents(id: string): Promise<Page<UserEvent>> {
+    return request<Page<UserEvent>>(`/api/requests/${id}/events`);
   },
 };

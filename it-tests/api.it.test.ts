@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { AuthRepository, EventStore, UserRepository } from '@test/core';
+import { AuthRepository, EventStore, RequestRepository, UserRepository } from '@test/core';
 import { createApp } from '@test/app';
 
 import { DEFAULT_PASSWORD, insertUser } from './factories/user.ts';
@@ -26,6 +26,7 @@ describe('API (PostgreSQL + DynamoDB)', () => {
       users: new UserRepository(db),
       auth: new AuthRepository(db),
       events: new EventStore(getDocClient(), eventsTableName()),
+      requests: new RequestRepository(db),
     });
   };
 

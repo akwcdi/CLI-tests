@@ -35,3 +35,25 @@ export interface ApiErrorBody {
     field?: string;
   };
 }
+
+export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
+/** 申請。申請者名・決裁者名を含む一覧/詳細用の形。 */
+export interface ApprovalRequest {
+  id: string;
+  title: string;
+  amount: number;
+  status: RequestStatus;
+  requester_id: string;
+  requester_name: string;
+  decided_by: string | null;
+  decider_name: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+/** アプリトップに出す指標。 */
+export interface Overview {
+  users: number;
+  pendingRequests: number;
+}
