@@ -10,7 +10,7 @@
     "test:ut": "vitest run --config vitest.config.ts",
     "test:ut:watch": "vitest --config vitest.config.ts",
     "test:it": "vitest run --config vitest.config.it.ts",
-    "test:e2e": "pnpm --filter @test/e2e test",
+    "test:e2e": "pnpm --filter @test/web build && pnpm --filter @test/e2e test",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d --wait postgres localstack && docker compose -f docker/docker-compose.yml run --rm --no-deps flyway",
     "docker:down": "docker compose -f docker/docker-compose.yml down -v",
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"

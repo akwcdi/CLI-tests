@@ -4,13 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test:headed": "playwright test --headed",
+    "test": "node --experimental-strip-types setup/prepare.ts && playwright test",
+    "test:headed": "node --experimental-strip-types setup/prepare.ts && playwright test --headed",
     "report": "playwright show-report",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "install:browser": "playwright install --with-deps chromium"
   },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.717.0",
+    "@test/app": "workspace:*",
+    "@test/core": "workspace:*",
+    "pg": "^8.13.1"
+  },
   "devDependencies": {
-    "@playwright/test": "^1.49.1"
+    "@playwright/test": "^1.49.1",
+    "@types/pg": "^8.11.10"
   }
 }

@@ -2,19 +2,16 @@ import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { chromium, type FullConfig } from '@playwright/test';
 
-import { BASE_URL, STORAGE_STATE } from './playwright.config.ts';
-
-const TEST_USER = {
-  email: process.env.E2E_USER_EMAIL ?? 'e2e@example.com',
-  password: process.env.E2E_USER_PASSWORD ?? 'password',
-};
+import { STORAGE_STATE } from './playwright.config.ts';
+import { BASE_URL, E2E_USER } from './setup/env.ts';
 
 /**
- * テストユーザーで1回だけログインし、セッションを {@link STORAGE_STATE} に保存する。
- * 各テストは playwright.config.ts の `use.storageState` 経由でこれを読み込むため、
- * テストごとにログインし直す必要がない。
+ * シード済みの管理ユーザーで1回だけログインし、
+ * セッションを {@link STORAGE_STATE} に保存する。
  *
- * セレクタはこのプロジェクトのログイン画面に合わせて調整すること。
+ * 各テストは playwright.config.ts の `use.storageState` からこれを読むため、
+ * テストごとにログインし直さない。ログイン画面そのものの検証は
+ * tests/login.spec.ts が storageState を捨てて別途行う。
  */
 export default async function globalSetup(_config: FullConfig): Promise<void> {
   await mkdir(dirname(STORAGE_STATE), { recursive: true });
@@ -24,12 +21,13 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     const page = await browser.newPage({ baseURL: BASE_URL });
 
     await page.goto('/login');
-    await page.getByLabel('メールアドレス').fill(TEST_USER.email);
-    await page.getByLabel('パスワード').fill(TEST_USER.password);
+    await page.getByLabel('メールアドレス').fill(E2E_USER.email);
+    await page.getByLabel('パスワード').fill(E2E_USER.password);
     await page.getByRole('button', { name: 'ログイン' }).click();
 
-    // ログイン完了の確定待ち。ここが緩いと後続テストが不安定になる。
-    await page.waitForURL('**/dashboard');
+    // 一覧が出るまで待つ。ここが緩いと後続テストが不安定になる。
+    await page.waitForURL('**/users');
+    await page.getByRole('heading', { name: 'ユーザー一覧' }).waitFor();
 
     await page.context().storageState({ path: STORAGE_STATE });
   } finally {

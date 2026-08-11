@@ -28,8 +28,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # ルートの typecheck は packages/web を対象外にしている（jsx 設定が別）。
       - name: Typecheck
-        run: pnpm typecheck
+        run: |
+          pnpm typecheck
+          pnpm --filter @test/web typecheck
 
       # GitHub Actions は CI=true を自動で設定するので、
       # JUnit XML の出力とカバレッジ 100% 閾値がそのまま有効になる。
@@ -87,9 +90,9 @@ jobs:
         if: always()
         run: pnpm docker:down
 
-  # 対象アプリは playwright.config.ts の webServer が起動する。
-  # 既定はリポジトリ同梱のプレースホルダアプリで、E2E_BASE_URL を設定すると
-  # そのアプリに向き、webServer は起動しない。
+  # 実アプリ（Hono API + React SPA）に対して動かす。
+  # IT と同じ compose を使うが、DB とテーブルは別（db_e2e / events_e2e）。
+  # アプリの起動は playwright.config.ts の webServer が行う。
   e2e:
     name: E2E
     runs-on: ubuntu-latest
@@ -105,9 +108,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # ルートの typecheck は packages/e2e を対象外にしているので、ここで見る。
+      # ルートの typecheck は packages/e2e と packages/web を対象外にしている。
       - name: Typecheck
-        run: pnpm --filter @test/e2e typecheck
+        run: |
+          pnpm --filter @test/e2e typecheck
+          pnpm --filter @test/web typecheck
 
       # ブラウザ本体は 100MB 超あるので、lockfile が変わらない限り使い回す。
       - name: Cache Playwright browsers
@@ -121,8 +126,16 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @test/e2e exec playwright install --with-deps chromium
 
+      - name: Start containers
+        run: pnpm docker:up
+
+      # SPA をビルドし、DB を作り直してシードしてから Playwright を起動する。
       - name: Run E2E
         run: pnpm test:e2e
+
+      - name: Dump container logs
+        if: failure()
+        run: docker compose -f docker/docker-compose.yml logs --no-color --tail=200
 
       - name: Upload E2E results
         if: always()
@@ -132,5 +145,10 @@ jobs:
           path: |
             .test-result/e2e-junit.xml
             packages/e2e/playwright-report
+            packages/e2e/test-results
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Stop containers
+        if: always()
+        run: pnpm docker:down

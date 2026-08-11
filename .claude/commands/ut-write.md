@@ -14,8 +14,12 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash(pnpm test:ut*), Bash(pnpm vit
 
 - フレームワークは Vitest。設定は `vitest.config.ts`。
 - テストの置き場所は **対象と同じパッケージの `tests/` 配下**、
-  ファイル名は `<対象ファイル名>.test.ts`。
+  ファイル名は `<対象ファイル名>.test.ts`（React なら `.test.tsx`）。
   例: `packages/core/src/user.ts` → `packages/core/tests/user.test.ts`
+- React コンポーネントの場合はファイル冒頭に
+  `// @vitest-environment jsdom` を書き、`packages/web/tests/helpers.tsx` を
+  import する（`globals: false` のため自動クリーンアップが登録されず、
+  これを経由しないと前のテストの DOM が残る）。
 - **UT は Docker も DB も LocalStack も使わない。** 外部 I/O は必ずモックする。
   DB が必要になる検証は UT ではなく IT の担当（`/it-write` を使う）。
 - カバレッジ閾値は lines / branches / functions / statements すべて **100%**。
@@ -60,6 +64,8 @@ branches 100% の壁になるのはたいてい `??` とデフォルト引数の
   ただし、まず「引数で受け取る形に変えられないか」を検討し、
   変えられるなら**プロダクトコード側の設計を直す提案をする**。
 - 時刻・乱数・UUID は `vi.useFakeTimers()` や `vi.spyOn` で固定する。
+- React では `fetch` を直接叩かず、`api` モジュールごと `vi.mock` する
+  （`packages/web/tests/helpers.tsx` の `apiMock` が手本）。
 - `clearMocks` / `restoreMocks` は設定済みなので、手動リセットは不要。
 
 ## Step 3. テストケース表

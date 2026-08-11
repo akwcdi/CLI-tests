@@ -10,5 +10,5 @@
     "it-tests/**/*.ts",
     "*.config.ts"
   ],
-  "exclude": ["node_modules", "**/dist", "packages/e2e"]
+  "exclude": ["node_modules", "**/dist", "packages/e2e", "packages/web"]
 }

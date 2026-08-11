@@ -4,9 +4,18 @@
 
 | 層 | 置き場所 | 対象 | 外部依存 | 実行 |
 |---|---|---|---|---|
-| UT | `packages/*/tests/**/*.test.ts` | ロジック単体 | なし（すべてモック） | `pnpm test:ut` |
+| UT | `packages/*/tests/**/*.test.{ts,tsx}` | ロジック単体 | なし（すべてモック） | `pnpm test:ut` |
 | IT | `it-tests/**/*.it.test.ts` | 実 DB / 実 DynamoDB との結合 | Docker | `pnpm test:it` |
-| E2E | `packages/e2e/tests/**/*.spec.ts` | 画面越しの一連の操作 | 起動中のアプリ | `pnpm test:e2e` |
+| E2E | `packages/e2e/tests/**/*.spec.ts` | 画面越しの一連の操作 | Docker + アプリ | `pnpm test:e2e` |
+
+## パッケージ
+
+| パッケージ | 中身 |
+|---|---|
+| `@test/core` | ドメイン。users(PostgreSQL) と events(DynamoDB) のリポジトリ、認証 |
+| `@test/app` | Hono の API。すべての変更操作が DynamoDB にイベントを書く |
+| `@test/web` | React + Vite の管理コンソール |
+| `@test/e2e` | Playwright |
 
 判断に迷ったら: **モックで確かめられることは UT**。
 「実際の並び順」「UNIQUE 制約」「型変換」のように
@@ -36,7 +45,7 @@ Docker も DB も不要。設定は `vitest.config.ts`。
 
 | ファイル | 役割 |
 |---|---|
-| `src/index.ts` | エントリポイント（再エクスポートのみ） |
+| `src/index.ts` / `src/index.tsx` | エントリポイント（再エクスポート / マウントのみ） |
 | `src/types.ts` | 型定義（実行時コードなし） |
 | `src/config.ts` | 設定値の読み出し |
 | `src/db.ts` | DB / AWS クライアントの接続初期化 |
@@ -44,6 +53,15 @@ Docker も DB も不要。設定は `vitest.config.ts`。
 **これ以外を除外しない。** テストしにくいロジックが出てきたら、
 除外するのではなく上記以外のファイルへ切り出してテストする。
 監査は `/ut-run` が自動で行う。
+
+React コンポーネント（`.tsx`）も母集団に含まれる。jsdom を使うテストは
+ファイル冒頭に `// @vitest-environment jsdom` を書く。`globals: false` なので
+testing-library の自動クリーンアップは登録されない。
+`packages/web/tests/helpers.tsx` が `afterEach(cleanup)` を持っているので、
+web のテストは必ずこれを import すること。
+
+プロセスを起動するだけのファイル（`packages/app/server.ts`）は `src/` の外に置く。
+import しただけでポートを掴まないようにするためで、結果として母集団にも入らない。
 
 ## IT
 
@@ -87,38 +105,33 @@ beforeEach(async () => {
 ## E2E
 
 ```bash
+pnpm docker:up                            # IT と同じコンテナを使う
 pnpm --filter @test/e2e install:browser   # 初回のみ（Chromium）
 pnpm test:e2e
 ```
 
-Chromium のみ。`packages/e2e/global-setup.ts` が起動時に1度だけログインし、
-セッションを `.auth/user.json` に保存して全テストで使い回す。
-CI では `retries: 1` / `workers: 2`。
+`pnpm test:e2e` が順に行うこと:
 
-### テスト対象アプリ
+1. `@test/web` をビルド（アプリが `dist` を配信するため）
+2. `packages/e2e/setup/prepare.ts` — `db_e2e` を作り直し、Flyway、
+   `events_e2e` を作り直し、管理ユーザーとダミーデータを投入
+3. `webServer` がアプリを起動（API と SPA を同一オリジンで配信）
+4. `global-setup.ts` が1度だけログインし、`.auth/user.json` に保存
+5. 各テストは保存済みセッションで始まる
 
-`E2E_BASE_URL` の有無で向き先が変わる。
+**IT とは別の DB / テーブルを使う**（`db_e2e` / `events_e2e`）。
+共有すると片方の後始末がもう片方を壊すため。
 
-| `E2E_BASE_URL` | 挙動 |
-|---|---|
-| 未設定（既定） | `packages/e2e/fixtures/placeholder-app.mjs` を `webServer` が自動起動する |
-| 設定あり | そのアプリに向ける。プレースホルダは起動しない（アプリは起動済みであること） |
+Chromium のみ。CI では `retries: 1` / `workers: 2`。
+全テストが1つの DB を共有するので `fullyParallel: false`
+（ファイル内は直列、ファイル間は並列）。
+
+外部で起動済みのアプリに向けたい場合は `E2E_BASE_URL` を設定する。
+そのときアプリの起動もシードもこちらでは行わない。
 
 ```bash
 E2E_BASE_URL=http://localhost:8080 pnpm test:e2e
 ```
-
-**プレースホルダアプリはテスト対象ではない。**
-ログイン → セッション Cookie → 保護されたページ という最小の形しか持たず、
-E2E の足場（設定・globalSetup・storageState の受け渡し）が
-壊れていないことを CI で守るためだけに置いてある。
-
-実アプリができたら:
-
-1. `E2E_BASE_URL` を実アプリに向ける（CI ならワークフローに `env` を追加）
-2. `global-setup.ts` のセレクタと `waitForURL` を実際の画面に合わせる
-3. `tests/dashboard.spec.ts` を実際の検証に置き換える
-4. `fixtures/placeholder-app.mjs` を削除する
 
 ## CI
 
