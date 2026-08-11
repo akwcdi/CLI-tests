@@ -5,11 +5,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      run_e2e:
-        description: 'E2E も実行する（対象アプリが必要）'
-        type: boolean
-        default: false
 
 # 同じブランチへの連続 push では古い実行を打ち切る。
 concurrency:
@@ -92,12 +87,12 @@ jobs:
         if: always()
         run: pnpm docker:down
 
-  # 実アプリがまだ無く、global-setup.ts のセレクタもスタブ前提のため、
-  # 既定では走らせない。手動実行で run_e2e にチェックを入れたときだけ動く。
+  # 対象アプリは playwright.config.ts の webServer が起動する。
+  # 既定はリポジトリ同梱のプレースホルダアプリで、E2E_BASE_URL を設定すると
+  # そのアプリに向き、webServer は起動しない。
   e2e:
     name: E2E
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.run_e2e
     steps:
       - uses: actions/checkout@v4
 
@@ -110,11 +105,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # ルートの typecheck は packages/e2e を対象外にしているので、ここで見る。
+      - name: Typecheck
+        run: pnpm --filter @test/e2e typecheck
+
+      # ブラウザ本体は 100MB 超あるので、lockfile が変わらない限り使い回す。
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      # キャッシュヒット時もブラウザのダウンロードだけが省かれ、
+      # OS 側の依存ライブラリの導入は毎回走る。
       - name: Install Chromium
         run: pnpm --filter @test/e2e exec playwright install --with-deps chromium
-
-      # TODO: テスト対象アプリの起動ステップをここに追加する。
-      #       E2E_BASE_URL で向き先を変えられる（既定 http://localhost:3000）。
 
       - name: Run E2E
         run: pnpm test:e2e
