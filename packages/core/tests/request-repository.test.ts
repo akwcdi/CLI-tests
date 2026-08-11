@@ -221,25 +221,54 @@ describe('RequestRepository.submit', () => {
       .mockResolvedValueOnce(result([], 1))
       .mockResolvedValueOnce(result([updated]));
 
-    await expect(new RequestRepository(db).submit('req-1')).resolves.toBe(updated);
+    await expect(new RequestRepository(db).submit('req-1', REQUESTER)).resolves.toBe(updated);
     expect(callAt(query, 1).sql).toMatch(/UPDATE requests SET status = 'pending'/);
+    // 読んだときの状態を条件に入れて更新する。
+    expect(callAt(query, 1).sql).toMatch(/WHERE id = \$1 AND status = \$2/);
+    expect(callAt(query, 1).params).toEqual(['req-1', 'draft']);
   });
 
   it('存在しなければ RequestNotFoundError', async () => {
     const { db, query } = createDb();
     query.mockResolvedValueOnce(result([]));
 
-    await expect(new RequestRepository(db).submit('none')).rejects.toThrow(RequestNotFoundError);
+    await expect(new RequestRepository(db).submit('none', REQUESTER)).rejects.toThrow(
+      RequestNotFoundError,
+    );
+  });
+
+  // 他人の下書きを提出できると、提出者を詐称してから自分で承認できてしまう。
+  it('申請者本人でなければ ValidationError で、DB を触らない', async () => {
+    const { db, query } = createDb();
+    query.mockResolvedValueOnce(result([makeRow({ status: 'draft' })]));
+
+    await expect(new RequestRepository(db).submit('req-1', DECIDER)).rejects.toThrowError(
+      new ValidationError('requesterId', '他人の申請は提出できません'),
+    );
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('pending からの再提出は ValidationError', async () => {
     const { db, query } = createDb();
     query.mockResolvedValueOnce(result([makeRow({ status: 'pending' })]));
 
-    await expect(new RequestRepository(db).submit('req-1')).rejects.toThrowError(
+    await expect(new RequestRepository(db).submit('req-1', REQUESTER)).rejects.toThrowError(
       new ValidationError('status', 'pending から pending へは変更できません'),
     );
     expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  // 判定と更新の間に誰かが動かした場合。読み直させる。
+  it('更新が0行なら ValidationError で、読み直さない', async () => {
+    const { db, query } = createDb();
+    query
+      .mockResolvedValueOnce(result([makeRow({ status: 'draft' })]))
+      .mockResolvedValueOnce(result([], 0));
+
+    await expect(new RequestRepository(db).submit('req-1', REQUESTER)).rejects.toThrowError(
+      new ValidationError('status', '別の操作で状態が変わりました。読み直してください'),
+    );
+    expect(query).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -258,7 +287,9 @@ describe('RequestRepository.decide', () => {
     await expect(
       new RequestRepository(db).decide('req-1', 'approved', DECIDER, now),
     ).resolves.toBe(approved);
-    expect(callAt(query, 1).params).toEqual(['req-1', 'approved', DECIDER, now]);
+    // $2 は読んだときの状態。ここが一致しなければ更新されない。
+    expect(callAt(query, 1).params).toEqual(['req-1', 'pending', 'approved', DECIDER, now]);
+    expect(callAt(query, 1).sql).toMatch(/WHERE id = \$1 AND status = \$2/);
   });
 
   it('却下もできる', async () => {
@@ -270,7 +301,7 @@ describe('RequestRepository.decide', () => {
 
     await new RequestRepository(db).decide('req-1', 'rejected', DECIDER);
 
-    expect(callAt(query, 1).params[1]).toBe('rejected');
+    expect(callAt(query, 1).params[2]).toBe('rejected');
   });
 
   it('now を省略すると現在時刻を使う', async () => {
@@ -283,7 +314,20 @@ describe('RequestRepository.decide', () => {
 
     await new RequestRepository(db).decide('req-1', 'approved', DECIDER);
 
-    expect((callAt(query, 1).params[3] as Date).getTime()).toBeGreaterThanOrEqual(before);
+    expect((callAt(query, 1).params[4] as Date).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  // 2人が同時に決裁した場合。先に書いた側だけが通る。
+  it('更新が0行なら ValidationError で、イベントを書かせない', async () => {
+    const { db, query } = createDb();
+    query.mockResolvedValueOnce(result([pending])).mockResolvedValueOnce(result([], 0));
+
+    await expect(
+      new RequestRepository(db).decide('req-1', 'rejected', DECIDER),
+    ).rejects.toThrowError(
+      new ValidationError('status', '別の操作で状態が変わりました。読み直してください'),
+    );
+    expect(query).toHaveBeenCalledTimes(2);
   });
 
   it('自分が出した申請は決裁できない', async () => {

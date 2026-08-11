@@ -18,14 +18,19 @@ export class RequestNotFoundError extends Error {
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
-/** 申請者名・決裁者名を添えて取得する共通の SELECT。 */
+/**
+ * 申請者名・決裁者名を添えて取得する共通の SELECT。
+ *
+ * 申請者側も LEFT JOIN。内部結合にすると、アカウントを消した人の申請が
+ * 一覧から丸ごと消え、件数だけが黙って減る。
+ */
 const SELECT_WITH_NAMES = `
   SELECT r.id, r.title, r.amount, r.status, r.requester_id, r.decided_by,
          r.created_at, r.decided_at,
          requester.name AS requester_name,
          decider.name   AS decider_name
     FROM requests r
-    JOIN users requester ON requester.id = r.requester_id
+    LEFT JOIN users requester ON requester.id = r.requester_id
     LEFT JOIN users decider ON decider.id = r.decided_by`;
 
 interface RequestCursor {
@@ -132,12 +137,20 @@ export class RequestRepository {
     };
   }
 
-  /** 下書きを承認へ回す。 */
-  async submit(id: string): Promise<RequestWithNames> {
+  /**
+   * 下書きを承認へ回す。提出できるのは申請者本人だけ。
+   *
+   * ここで持ち主を見ないと、他人の下書きを提出してから自分で承認でき、
+   * 「自分が出した申請は決裁できない」が単独で回避できてしまう。
+   */
+  async submit(id: string, requesterId: string): Promise<RequestWithNames> {
     const current = await this.#requireById(id);
+    if (current.requester_id !== requesterId) {
+      throw new ValidationError('requesterId', '他人の申請は提出できません');
+    }
     this.#assertTransition(current.status, 'pending');
 
-    await this.#db.query(`UPDATE requests SET status = 'pending' WHERE id = $1`, [id]);
+    await this.#updateStatus(id, current.status, `SET status = 'pending'`, []);
     return this.#requireById(id);
   }
 
@@ -158,9 +171,11 @@ export class RequestRepository {
       throw new ValidationError('deciderId', '自分が出した申請は決裁できません');
     }
 
-    await this.#db.query(
-      `UPDATE requests SET status = $2, decided_by = $3, decided_at = $4 WHERE id = $1`,
-      [id, next, deciderId, now],
+    await this.#updateStatus(
+      id,
+      current.status,
+      `SET status = $3, decided_by = $4, decided_at = $5`,
+      [next, deciderId, now],
     );
     return this.#requireById(id);
   }
@@ -177,6 +192,29 @@ export class RequestRepository {
   #assertTransition(from: RequestStatus, to: RequestStatus): void {
     if (!canTransitionRequest(from, to)) {
       throw new ValidationError('status', `${from} から ${to} へは変更できません`);
+    }
+  }
+
+  /**
+   * 読んだときの状態を条件に入れて更新する。
+   *
+   * 状態の判定と更新は別の問い合わせなので、その間に他の決裁が入ると
+   * 両方が遷移を通ってしまう。行が更新されなければ、間に誰かが動かした
+   * ということなので、イベントを書く前に失敗させる。
+   * `setClause` のプレースホルダは $3 から始めること。
+   */
+  async #updateStatus(
+    id: string,
+    expected: RequestStatus,
+    setClause: string,
+    params: unknown[],
+  ): Promise<void> {
+    const result = await this.#db.query(
+      `UPDATE requests ${setClause} WHERE id = $1 AND status = $2`,
+      [id, expected, ...params],
+    );
+    if (result.rowCount === 0) {
+      throw new ValidationError('status', '別の操作で状態が変わりました。読み直してください');
     }
   }
 }

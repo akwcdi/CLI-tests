@@ -195,7 +195,8 @@ export function createApp(deps: Deps): Hono<AppEnv> {
 
   app.post('/api/requests/:id/submit', async (c) => {
     const id = c.req.param('id');
-    const updated = await requests.submit(id);
+    // 提出できるのは申請者本人だけ。クライアントの指定は受け付けない。
+    const updated = await requests.submit(id, c.get('user').id);
     await recordEvent(events, id, EVENT_TYPES.requestSubmitted);
     return c.json({ request: updated });
   });

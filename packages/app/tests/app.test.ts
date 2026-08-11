@@ -647,7 +647,8 @@ describe('申請 API', () => {
       });
 
       expect(res.status).toBe(200);
-      expect(ctx.requests.submit).toHaveBeenCalledWith(REQUEST_ID);
+      // 提出者はサインイン中の本人。クライアントからは指定できない。
+      expect(ctx.requests.submit).toHaveBeenCalledWith(REQUEST_ID, USER_ID);
       expect(ctx.events.append).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'request.submitted' }),
       );

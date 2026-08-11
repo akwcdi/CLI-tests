@@ -81,7 +81,7 @@ describe('RequestRepository (PostgreSQL)', () => {
       const decider = await insertUser({ name: '決裁 花子' });
       const draft = await insertRequest({ requester_id: requester.id, status: 'draft' });
 
-      const submitted = await repo().submit(draft.id);
+      const submitted = await repo().submit(draft.id, requester.id);
       expect(submitted.status).toBe('pending');
 
       const approved = await repo().decide(draft.id, 'approved', decider.id);
@@ -120,7 +120,7 @@ describe('RequestRepository (PostgreSQL)', () => {
 
     it('存在しない id は RequestNotFoundError', async () => {
       await expect(
-        repo().submit('00000000-0000-4000-8000-000000000000'),
+        repo().submit('00000000-0000-4000-8000-000000000000', '00000000-0000-4000-8000-000000000001'),
       ).rejects.toThrow(RequestNotFoundError);
     });
   });
@@ -134,13 +134,35 @@ describe('RequestRepository (PostgreSQL)', () => {
       ).rejects.toThrow(/requests_decided_consistency/);
     });
 
-    it('申請者を削除すると申請も消える（ON DELETE CASCADE）', async () => {
+    // 決裁の記録は人事の変更より寿命が長い。退職者のアカウントを消しても、
+    // その人が出した申請は金額ごと残す。
+    it('申請者を削除しても申請は残り、申請者名だけが消える', async () => {
+      const requester = await insertUser();
+      const decider = await insertUser();
+      const req = await insertRequest({
+        requester_id: requester.id,
+        status: 'approved',
+        decided_by: decider.id,
+        decided_at: new Date(),
+      });
+
+      await tx().query('DELETE FROM users WHERE id = $1', [requester.id]);
+
+      const reloaded = await repo().findById(req.id);
+      expect(reloaded?.status).toBe('approved');
+      expect(reloaded?.amount).toBe(req.amount);
+      expect(reloaded?.requester_id).toBeNull();
+      expect(reloaded?.requester_name).toBeNull();
+    });
+
+    it('申請者を消しても一覧から落ちない（内部結合にしない）', async () => {
       const requester = await insertUser();
       const req = await insertRequest({ requester_id: requester.id });
 
       await tx().query('DELETE FROM users WHERE id = $1', [requester.id]);
 
-      await expect(repo().findById(req.id)).resolves.toBeNull();
+      const page = await repo().list({ limit: 50 });
+      expect(page.items.map((r) => r.id)).toContain(req.id);
     });
 
     it('決裁者を削除しても申請は残り、決裁者名だけが消える', async () => {

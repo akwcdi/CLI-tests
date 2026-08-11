@@ -61,15 +61,16 @@ export interface RequestRow {
   title: string;
   amount: number;
   status: RequestStatus;
-  requester_id: string;
+  /** 申請者。アカウントが削除されると null になる（申請自体は残る）。 */
+  requester_id: string | null;
   decided_by: string | null;
   created_at: Date;
   decided_at: Date | null;
 }
 
-/** 一覧表示用に申請者名を添えた行。 */
+/** 一覧表示用に申請者名を添えた行。名前はアカウント削除で失われる。 */
 export interface RequestWithNames extends RequestRow {
-  requester_name: string;
+  requester_name: string | null;
   decider_name: string | null;
 }
 

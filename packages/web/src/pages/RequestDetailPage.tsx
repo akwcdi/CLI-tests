@@ -9,6 +9,7 @@ import {
   eventTone,
   formatAmount,
   formatDateTime,
+  personName,
   requestLabel,
   requestTone,
 } from '../status.ts';
@@ -85,7 +86,7 @@ export function RequestDetailPage() {
               <dt>金額</dt>
               <dd className="data data--strong">{formatAmount(item.amount)}</dd>
               <dt>申請者</dt>
-              <dd>{item.requester_name}</dd>
+              <dd>{personName(item.requester_name)}</dd>
               <dt>作成</dt>
               <dd className="data">{formatDateTime(item.created_at)}</dd>
               <dt>決裁</dt>
@@ -94,7 +95,7 @@ export function RequestDetailPage() {
                   <span className="data">未決裁</span>
                 ) : (
                   <>
-                    {item.decider_name ?? '（削除済みの利用者）'}{' '}
+                    {personName(item.decider_name)}{' '}
                     <span className="data">{formatDateTime(item.decided_at)}</span>
                   </>
                 )}

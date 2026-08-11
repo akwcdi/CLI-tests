@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api.ts';
 import { AppShell } from '../components/AppShell.tsx';
 import { toMessage } from '../error-message.ts';
-import { formatAmount, formatDateTime, requestLabel, requestTone } from '../status.ts';
+import { formatAmount, formatDateTime, personName, requestLabel, requestTone } from '../status.ts';
 import type { ApprovalRequest, RequestStatus } from '../types.ts';
 
 const PAGE_SIZE = 5;
@@ -162,7 +162,7 @@ export function RequestsPage() {
                         {item.title}
                       </Link>
                     </td>
-                    <td>{item.requester_name}</td>
+                    <td>{personName(item.requester_name)}</td>
                     <td className="data data--strong">{formatAmount(item.amount)}</td>
                     <td>
                       <span className={`status status--${requestTone(item.status)}`}>

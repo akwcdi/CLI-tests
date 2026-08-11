@@ -44,8 +44,9 @@ export interface ApprovalRequest {
   title: string;
   amount: number;
   status: RequestStatus;
-  requester_id: string;
-  requester_name: string;
+  /** 申請者。アカウントが削除されると null になる（申請自体は残る）。 */
+  requester_id: string | null;
+  requester_name: string | null;
   decided_by: string | null;
   decider_name: string | null;
   created_at: string;

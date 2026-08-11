@@ -78,6 +78,14 @@ export function initials(name: string): string {
   return first ?? '?';
 }
 
+/**
+ * 表示用の氏名。アカウントを消しても申請は残るので、名前だけが引けない
+ * 行が出る。申請者と決裁者で同じ言い方をする。
+ */
+export function personName(name: string | null): string {
+  return name ?? '（削除済みの利用者）';
+}
+
 /** ISO 日時を画面用に整える。等幅で並ぶことを前提に桁を固定する。 */
 export function formatDateTime(iso: string): string {
   const at = new Date(iso);
