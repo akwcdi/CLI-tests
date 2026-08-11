@@ -5,7 +5,8 @@
 export { AuthRepository } from './auth-repository.ts';
 export { config } from './config.ts';
 export { createPool, createDynamoDocumentClient } from './db.ts';
-export { EventStore, InvalidCursorError, encodeCursor, decodeCursor } from './event-store.ts';
+export { InvalidCursorError, encodeCursor, decodeCursor, type CursorKey } from './cursor.ts';
+export { EventStore } from './event-store.ts';
 export { hashPassword, verifyPassword } from './password.ts';
 export {
   SESSION_COOKIE,

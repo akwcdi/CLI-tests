@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { decodeCursor, encodeCursor, InvalidCursorError } from '../src/cursor.ts';
 import type { NewUser, UserRow } from '../src/types.ts';
 import { UserNotFoundError, UserRepository, type Queryable } from '../src/user-repository.ts';
 import { ValidationError } from '../src/user.ts';
@@ -139,7 +140,7 @@ describe('UserRepository.list', () => {
     expect(page.nextCursor).toBeNull();
   });
 
-  it('次ページがあれば limit 件に切り詰めて nextCursor を返す', async () => {
+  it('次ページがあれば limit 件に切り詰め、(created_at, id) の複合カーソルを返す', async () => {
     const { db, query } = createDb();
     const rows = [
       makeRow({ id: 'a', created_at: new Date('2026-03-03T00:00:00.000Z') }),
@@ -151,18 +152,35 @@ describe('UserRepository.list', () => {
     const page = await new UserRepository(db).list({ limit: 2 });
 
     expect(page.items.map((r) => r.id)).toEqual(['a', 'b']);
-    // 最後に返した行の created_at が次のカーソルになる。
-    expect(page.nextCursor).toBe('2026-02-02T00:00:00.000Z');
+    // created_at だけだと同時刻の行を取りこぼすので id も持つ。
+    expect(decodeCursor(page.nextCursor as string)).toEqual({
+      created_at: '2026-02-02T00:00:00.000Z',
+      id: 'b',
+    });
   });
 
-  it('cursor 指定時は created_at < $1 で絞り込む', async () => {
+  it('cursor 指定時は (created_at, id) の行値比較で絞り込む', async () => {
     const { db, query } = createDb();
     query.mockResolvedValueOnce(result([]));
+    const cursor = encodeCursor({ created_at: '2026-02-02T00:00:00.000Z', id: 'b' });
 
-    await new UserRepository(db).list({ limit: 5, cursor: '2026-02-02T00:00:00.000Z' });
+    await new UserRepository(db).list({ limit: 5, cursor });
 
-    expect(query.mock.calls[0]?.[0]).toMatch(/created_at </);
-    expect(query.mock.calls[0]?.[1]).toEqual(['2026-02-02T00:00:00.000Z', 6]);
+    // ORDER BY と同じ組で比較していること。created_at 単独では不可。
+    expect(query.mock.calls[0]?.[0]).toMatch(/\(created_at, id\) < \(\$1::timestamptz, \$2::uuid\)/);
+    expect(query.mock.calls[0]?.[1]).toEqual(['2026-02-02T00:00:00.000Z', 'b', 6]);
+  });
+
+  it.each([
+    ['JSON として壊れている', 'broken!!'],
+    ['created_at が無い', encodeCursor({ id: 'b' })],
+    ['id が無い', encodeCursor({ created_at: '2026-02-02T00:00:00.000Z' })],
+    ['型が違う', encodeCursor({ created_at: 1, id: 2 })],
+  ])('cursor が不正なら InvalidCursorError で DB を触らない: %s', async (_label, cursor) => {
+    const { db, query } = createDb();
+
+    await expect(new UserRepository(db).list({ cursor })).rejects.toThrow(InvalidCursorError);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('cursor に null を渡した場合は cursor 無しとして扱う', async () => {
