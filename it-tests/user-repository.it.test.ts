@@ -13,7 +13,7 @@ describe('UserRepository (PostgreSQL)', () => {
 
   describe('create', () => {
     it('実際に行が保存され、読み戻せる', async () => {
-      const created = await repo().create({ email: 'Alice@Example.com', name: ' Alice ' });
+      const created = await repo().create({ email: 'Alice@Example.com', name: ' Alice ', password: 'password123' });
 
       expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
       expect(created.email).toBe('alice@example.com');
@@ -28,7 +28,7 @@ describe('UserRepository (PostgreSQL)', () => {
     it('登録済みのメールは ValidationError（DB の UNIQUE 制約より手前で弾く）', async () => {
       await insertUser({ email: 'dup@example.com' });
 
-      await expect(repo().create({ email: 'DUP@example.com', name: 'Bob' })).rejects.toThrow(
+      await expect(repo().create({ email: 'DUP@example.com', name: 'Bob', password: 'password123' })).rejects.toThrow(
         ValidationError,
       );
     });

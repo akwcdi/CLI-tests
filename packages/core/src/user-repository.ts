@@ -1,3 +1,4 @@
+import { hashPassword } from './password.ts';
 import type { Page, NewUser, UserRow, UserStatus } from './types.ts';
 import { canTransition, normalizeEmail, validateNewUser, ValidationError } from './user.ts';
 
@@ -40,10 +41,10 @@ export class UserRepository {
     }
 
     const result = await this.#db.query<UserRow>(
-      `INSERT INTO users (email, name, status)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (email, name, status, password_hash)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, email, name, status, created_at`,
-      [valid.email, valid.name, valid.status],
+      [valid.email, valid.name, valid.status, await hashPassword(valid.password)],
     );
 
     const row = result.rows[0];

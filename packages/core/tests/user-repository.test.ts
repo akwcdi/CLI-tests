@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { UserRow } from '../src/types.ts';
+import type { NewUser, UserRow } from '../src/types.ts';
 import { UserNotFoundError, UserRepository, type Queryable } from '../src/user-repository.ts';
 import { ValidationError } from '../src/user.ts';
 
@@ -27,6 +27,13 @@ function result(rows: UserRow[], rowCount: number | null = rows.length) {
 }
 
 describe('UserRepository.create', () => {
+  const newUser = (overrides: Partial<NewUser> = {}): NewUser => ({
+    email: 'user@example.com',
+    name: 'Taro',
+    password: 'password123',
+    ...overrides,
+  });
+
   it('重複が無ければ INSERT して挿入行を返す', async () => {
     const { db, query } = createDb();
     const row = makeRow();
@@ -34,20 +41,23 @@ describe('UserRepository.create', () => {
     query.mockResolvedValueOnce(result([])).mockResolvedValueOnce(result([row]));
     const repo = new UserRepository(db);
 
-    const created = await repo.create({ email: ' USER@Example.com ', name: ' Taro ' });
+    const created = await repo.create(newUser({ email: ' USER@Example.com ', name: ' Taro ' }));
 
     expect(created).toBe(row);
     expect(query).toHaveBeenCalledTimes(2);
-    // 正規化された値で INSERT されること。
-    expect(query.mock.calls[1]?.[1]).toEqual(['user@example.com', 'Taro', 'active']);
     expect(query.mock.calls[1]?.[0]).toMatch(/INSERT INTO users/);
+
+    // 正規化された値で INSERT され、パスワードは平文で渡らないこと。
+    const params = query.mock.calls[1]?.[1] ?? [];
+    expect(params.slice(0, 3)).toEqual(['user@example.com', 'Taro', 'active']);
+    expect(params[3]).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
   });
 
   it('入力が不正なら DB を触らずに ValidationError', async () => {
     const { db, query } = createDb();
     const repo = new UserRepository(db);
 
-    await expect(repo.create({ email: 'bad', name: 'Taro' })).rejects.toThrow(ValidationError);
+    await expect(repo.create(newUser({ email: 'bad' }))).rejects.toThrow(ValidationError);
     expect(query).not.toHaveBeenCalled();
   });
 
@@ -56,9 +66,7 @@ describe('UserRepository.create', () => {
     query.mockResolvedValueOnce(result([makeRow()]));
     const repo = new UserRepository(db);
 
-    await expect(repo.create({ email: 'user@example.com', name: 'Taro' })).rejects.toThrow(
-      /email already registered/,
-    );
+    await expect(repo.create(newUser())).rejects.toThrow(/email already registered/);
     expect(query).toHaveBeenCalledTimes(1);
   });
 
@@ -67,9 +75,7 @@ describe('UserRepository.create', () => {
     query.mockResolvedValueOnce(result([])).mockResolvedValueOnce(result([]));
     const repo = new UserRepository(db);
 
-    await expect(repo.create({ email: 'user@example.com', name: 'Taro' })).rejects.toThrow(
-      'INSERT returned no row',
-    );
+    await expect(repo.create(newUser())).rejects.toThrow('INSERT returned no row');
   });
 });
 

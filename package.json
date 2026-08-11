@@ -16,17 +16,24 @@
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.717.0",
     "@aws-sdk/lib-dynamodb": "^3.717.0",
+    "@test/app": "workspace:*",
     "@test/core": "workspace:*",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
-    "pg": "^8.13.1",
     "@vitest/coverage-v8": "^3.0.5",
+    "pg": "^8.13.1",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.0",
+    "hono": "^4.13.1"
   }
 }

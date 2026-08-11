@@ -18,7 +18,22 @@ export type UserStatus = 'active' | 'suspended';
 export interface NewUser {
   email: string;
   name: string;
+  password: string;
   status?: UserStatus;
+}
+
+/** ログイン照合に使う最小限の情報。password_hash を UserRow に含めないための型。 */
+export interface UserCredentials {
+  id: string;
+  password_hash: string;
+}
+
+/** sessions テーブルの1行。 */
+export interface SessionRow {
+  token: string;
+  user_id: string;
+  created_at: Date;
+  expires_at: Date;
 }
 
 /** DynamoDB events テーブルの1アイテム。 */
