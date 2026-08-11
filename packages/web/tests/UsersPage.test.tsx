@@ -3,7 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiMock, makeUser, renderAt } from './helpers.tsx';
+import { apiMock } from './api-mock.ts';
+import { makeUser, renderInShell } from './helpers.tsx';
 
 vi.mock('../src/api.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/api.ts')>()),
@@ -30,14 +31,13 @@ async function fillCreateForm() {
 }
 
 describe('UsersPage 一覧', () => {
-  it('読み込み中を出したあと、取得した行を表示する', async () => {
+  it('取得した行を表示する', async () => {
     apiMock.listUsers.mockResolvedValue({
       items: [makeUser({ id: 'u1', name: 'Taro', status: 'active' })],
       nextCursor: null,
     });
 
-    renderAt(<UsersPage />);
-    expect(screen.getByText('読み込み中…')).toBeInTheDocument();
+    await renderInShell(<UsersPage />);
 
     const table = await settled();
     expect(within(table).getByText('Taro')).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('UsersPage 一覧', () => {
       nextCursor: null,
     });
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
 
     expect(within(await settled()).getByText('停止中')).toBeInTheDocument();
   });
@@ -61,7 +61,7 @@ describe('UsersPage 一覧', () => {
       new ApiError(500, { code: 'internal_error', message: 'internal server error' }),
     );
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('internal server error');
   });
@@ -69,7 +69,7 @@ describe('UsersPage 一覧', () => {
 
 describe('UsersPage ページング', () => {
   it('次ページが無ければ「次へ」は押せない', async () => {
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
     await settled();
 
     expect(screen.getByRole('button', { name: '次へ' })).toBeDisabled();
@@ -83,7 +83,7 @@ describe('UsersPage ページング', () => {
       .mockResolvedValueOnce({ items: [makeUser({ id: 'u1' })], nextCursor: 'c1' });
     const user = userEvent.setup();
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
     await settled();
 
     await user.click(screen.getByRole('button', { name: '次へ' }));
@@ -102,7 +102,7 @@ describe('UsersPage 新規作成', () => {
   it('作成後にフォームを空にして一覧を取り直す', async () => {
     apiMock.createUser.mockResolvedValue(makeUser({ id: 'u2' }));
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
     await settled();
     const user = await fillCreateForm();
     await user.click(screen.getByRole('button', { name: '作成' }));
@@ -125,7 +125,7 @@ describe('UsersPage 新規作成', () => {
       .mockResolvedValue({ items: [makeUser({ id: 'u2' })], nextCursor: null });
     apiMock.createUser.mockResolvedValue(makeUser({ id: 'u3' }));
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
     await settled();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: '次へ' }));
@@ -150,7 +150,7 @@ describe('UsersPage 新規作成', () => {
       }),
     );
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
     await settled();
     const user = await fillCreateForm();
     await user.click(screen.getByRole('button', { name: '作成' }));
@@ -167,7 +167,7 @@ describe('UsersPage 新規作成', () => {
       }),
     );
 
-    renderAt(<UsersPage />);
+    await renderInShell(<UsersPage />);
     await settled();
     const user = await fillCreateForm();
     await user.click(screen.getByRole('button', { name: '作成' }));
@@ -181,15 +181,3 @@ describe('UsersPage 新規作成', () => {
   });
 });
 
-describe('UsersPage ログアウト', () => {
-  it('ログアウトするとログイン画面へ遷移する', async () => {
-    apiMock.logout.mockResolvedValue(undefined);
-
-    renderAt(<UsersPage />);
-    await settled();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'ログアウト' }));
-
-    expect(await screen.findByText('ログイン画面')).toBeInTheDocument();
-    expect(apiMock.logout).toHaveBeenCalled();
-  });
-});

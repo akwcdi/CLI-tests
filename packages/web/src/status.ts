@@ -69,10 +69,13 @@ export function eventTone(type: string): Tone {
   return EVENT_TONE[type] ?? 'neutral';
 }
 
-/** アバターに出す頭文字。氏名が空でも 1 文字は返す。 */
+/**
+ * アバターに出す頭文字。氏名が空でも 1 文字は返す。
+ * サロゲートペアを 1 文字として扱うため、コードポイントで切る。
+ */
 export function initials(name: string): string {
-  const trimmed = name.trim();
-  return trimmed === '' ? '?' : [...trimmed][0] ?? '?';
+  const [first] = [...name.trim()];
+  return first ?? '?';
 }
 
 /** ISO 日時を画面用に整える。等幅で並ぶことを前提に桁を固定する。 */

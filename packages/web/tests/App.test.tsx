@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiMock, makeUser } from './helpers.tsx';
+import { apiMock } from './api-mock.ts';
+import { makeRequest, makeUser } from './helpers.tsx';
 
 vi.mock('../src/api.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/api.ts')>()),
@@ -52,10 +53,39 @@ describe('App のルーティング', () => {
     expect(apiMock.getUser).toHaveBeenCalledWith('u1');
   });
 
-  it('未知のパスは一覧へリダイレクトする', async () => {
+  it('未知のパスはアプリトップへリダイレクトする', async () => {
+    apiMock.overview.mockResolvedValue({ users: 3, pendingRequests: 1 });
+
     renderApp('/no-such-page');
 
-    expect(await screen.findByRole('heading', { name: 'ユーザー一覧' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /さん/ })).toBeInTheDocument();
+  });
+
+  it('/ はアプリトップ', async () => {
+    apiMock.overview.mockResolvedValue({ users: 3, pendingRequests: 1 });
+
+    renderApp('/');
+
+    expect(await screen.findByRole('link', { name: /ユーザー管理/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /申請管理/ })).toBeInTheDocument();
+  });
+
+  it('/requests は申請一覧', async () => {
+    apiMock.listRequests.mockResolvedValue({ items: [], nextCursor: null });
+
+    renderApp('/requests');
+
+    expect(await screen.findByRole('heading', { name: '申請' })).toBeInTheDocument();
+  });
+
+  it('/requests/:id は申請詳細', async () => {
+    apiMock.getRequest.mockResolvedValue(makeRequest({ title: '備品購入' }));
+    apiMock.listRequestEvents.mockResolvedValue({ items: [], nextCursor: null });
+
+    renderApp('/requests/r1');
+
+    expect(await screen.findByRole('heading', { name: '備品購入' })).toBeInTheDocument();
+    expect(apiMock.getRequest).toHaveBeenCalledWith('r1');
   });
 
   it('未認証で保護されたパスを開くとログイン画面になる', async () => {

@@ -3,7 +3,8 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiMock, makeUser, renderAt } from './helpers.tsx';
+import { apiMock } from './api-mock.ts';
+import { makeUser, renderAt } from './helpers.tsx';
 
 vi.mock('../src/api.ts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/api.ts')>()),
@@ -26,7 +27,7 @@ async function fillAndSubmit() {
 
 describe('LoginPage', () => {
   it('入力欄と送信ボタンを表示する', () => {
-    renderAt(<LoginPage />);
+    renderAt(<LoginPage />, '/login', '/login');
 
     expect(screen.getByRole('heading', { name: 'ログイン' })).toBeInTheDocument();
     expect(screen.getByLabelText('メールアドレス')).toBeInTheDocument();
@@ -34,14 +35,14 @@ describe('LoginPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('入力した資格情報で login を呼び、一覧へ遷移する', async () => {
+  it('入力した資格情報で login を呼び、アプリトップへ遷移する', async () => {
     apiMock.login.mockResolvedValue(makeUser());
 
-    renderAt(<LoginPage />);
+    renderAt(<LoginPage />, '/login', '/login');
     await fillAndSubmit();
 
     expect(apiMock.login).toHaveBeenCalledWith('admin@example.com', 'password123');
-    expect(await screen.findByText('一覧画面')).toBeInTheDocument();
+    expect(await screen.findByText('アプリトップ')).toBeInTheDocument();
   });
 
   it('認証に失敗するとサーバーの文言を表示し、遷移しない', async () => {
@@ -49,17 +50,17 @@ describe('LoginPage', () => {
       new ApiError(401, { code: 'unauthorized', message: 'email or password is incorrect' }),
     );
 
-    renderAt(<LoginPage />);
+    renderAt(<LoginPage />, '/login', '/login');
     await fillAndSubmit();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('email or password is incorrect');
-    expect(screen.queryByText('一覧画面')).not.toBeInTheDocument();
+    expect(screen.queryByText('アプリトップ')).not.toBeInTheDocument();
   });
 
   it('想定外の例外では汎用の文言を出す', async () => {
     apiMock.login.mockRejectedValue(new TypeError('Failed to fetch'));
 
-    renderAt(<LoginPage />);
+    renderAt(<LoginPage />, '/login', '/login');
     await fillAndSubmit();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('予期しないエラーが発生しました');
@@ -73,7 +74,7 @@ describe('LoginPage', () => {
       }),
     );
 
-    renderAt(<LoginPage />);
+    renderAt(<LoginPage />, '/login', '/login');
     await fillAndSubmit();
 
     const button = screen.getByRole('button', { name: 'ログイン' });
@@ -81,7 +82,7 @@ describe('LoginPage', () => {
 
     resolve(makeUser());
     await waitFor(() => {
-      expect(screen.getByText('一覧画面')).toBeInTheDocument();
+      expect(screen.getByText('アプリトップ')).toBeInTheDocument();
     });
   });
 });

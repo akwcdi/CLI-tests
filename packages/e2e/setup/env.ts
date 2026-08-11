@@ -23,6 +23,16 @@ export const E2E_USER = {
   name: 'E2E Admin',
 } as const;
 
+/**
+ * シードで作る一般利用者。自分の申請は決裁できないため、
+ * 承認フローの検証には申請者とは別のこの利用者でサインインする。
+ */
+export const E2E_MEMBER = {
+  email: 'member1@example.com',
+  password: 'password123',
+  name: 'Member 1',
+} as const;
+
 /** アプリを起動するポートと URL。 */
 export const APP_PORT = Number(process.env.E2E_PORT ?? 3000);
 export const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${APP_PORT}`;

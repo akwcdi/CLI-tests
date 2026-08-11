@@ -25,9 +25,8 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
     await page.getByLabel('パスワード').fill(E2E_USER.password);
     await page.getByRole('button', { name: 'ログイン' }).click();
 
-    // 一覧が出るまで待つ。ここが緩いと後続テストが不安定になる。
-    await page.waitForURL('**/users');
-    await page.getByRole('heading', { name: 'ユーザー一覧' }).waitFor();
+    // アプリトップが出るまで待つ。ここが緩いと後続テストが不安定になる。
+    await page.getByRole('heading', { name: /さん/ }).waitFor();
 
     await page.context().storageState({ path: STORAGE_STATE });
   } finally {
