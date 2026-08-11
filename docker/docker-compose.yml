@@ -54,9 +54,12 @@ services:
     ports:
       - '4566:4566'
     healthcheck:
+      # LocalStack は未使用のサービスを "available"、一度使われたものを
+      # "running" として報告する。両方を正常として扱わないと、
+      # テストを1回流した時点で unhealthy に落ちる。
       test:
         - CMD-SHELL
-        - 'curl -sf http://localhost:4566/_localstack/health | grep -q ''"dynamodb": "available"'''
+        - 'curl -sf http://localhost:4566/_localstack/health | grep -qE ''"dynamodb": "(available|running)"'''
       interval: 3s
       timeout: 5s
       retries: 30

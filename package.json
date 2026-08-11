@@ -6,6 +6,10 @@
   "packageManager": "pnpm@10.19.0",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "pnpm --filter @test/web build && pnpm dev:seed && pnpm --filter @test/app dev",
+    "dev:seed": "pnpm --filter @test/app seed:dev",
+    "dev:web": "pnpm --filter @test/web dev",
+    "dev:api": "pnpm --filter @test/app dev",
     "test": "pnpm run test:ut",
     "test:ut": "vitest run --config vitest.config.ts",
     "test:ut:watch": "vitest --config vitest.config.ts",
