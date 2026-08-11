@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { UserNotFoundError, UserRepository, ValidationError } from '@test/core';
+import { InvalidCursorError, UserNotFoundError, UserRepository, ValidationError } from '@test/core';
 
 import { insertUser } from './factories/user.ts';
 import { getPool, useTransaction } from './setup/db.ts';
@@ -13,7 +13,7 @@ describe('UserRepository (PostgreSQL)', () => {
 
   describe('create', () => {
     it('実際に行が保存され、読み戻せる', async () => {
-      const created = await repo().create({ email: 'Alice@Example.com', name: ' Alice ' });
+      const created = await repo().create({ email: 'Alice@Example.com', name: ' Alice ', password: 'password123' });
 
       expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
       expect(created.email).toBe('alice@example.com');
@@ -28,7 +28,7 @@ describe('UserRepository (PostgreSQL)', () => {
     it('登録済みのメールは ValidationError（DB の UNIQUE 制約より手前で弾く）', async () => {
       await insertUser({ email: 'dup@example.com' });
 
-      await expect(repo().create({ email: 'DUP@example.com', name: 'Bob' })).rejects.toThrow(
+      await expect(repo().create({ email: 'DUP@example.com', name: 'Bob', password: 'password123' })).rejects.toThrow(
         ValidationError,
       );
     });
@@ -54,11 +54,33 @@ describe('UserRepository (PostgreSQL)', () => {
 
       const first = await repo().list({ limit: 2 });
       expect(first.items.map((u) => u.id)).toEqual([newer.id, middle.id]);
-      expect(first.nextCursor).toBe(middle.created_at.toISOString());
+      expect(first.nextCursor).not.toBeNull();
 
       const second = await repo().list({ limit: 2, cursor: first.nextCursor });
       expect(second.items.map((u) => u.id)).toEqual([older.id]);
       expect(second.nextCursor).toBeNull();
+    });
+
+    it('created_at が同一の行がページ境界を跨いでも取りこぼさない', async () => {
+      // created_at だけをカーソルにすると、同時刻の行が strict 比較で
+      // 丸ごと飛ばされて消える。実際に 3 件中 1 件が失われていた。
+      const sameMoment = new Date('2026-05-05T00:00:00.000Z');
+      const created = await Promise.all([
+        insertUser({ created_at: sameMoment }),
+        insertUser({ created_at: sameMoment }),
+        insertUser({ created_at: sameMoment }),
+      ]);
+
+      const first = await repo().list({ limit: 2 });
+      const second = await repo().list({ limit: 2, cursor: first.nextCursor });
+      const seen = [...first.items, ...second.items].map((u) => u.id);
+
+      expect(new Set(seen)).toEqual(new Set(created.map((u) => u.id)));
+      expect(seen).toHaveLength(3);
+    });
+
+    it('壊れたカーソルは InvalidCursorError', async () => {
+      await expect(repo().list({ cursor: 'broken!!' })).rejects.toThrow(InvalidCursorError);
     });
 
     it('1件も無ければ空ページ', async () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { UserRow } from '../src/types.ts';
+import { decodeCursor, encodeCursor, InvalidCursorError } from '../src/cursor.ts';
+import type { NewUser, UserRow } from '../src/types.ts';
 import { UserNotFoundError, UserRepository, type Queryable } from '../src/user-repository.ts';
 import { ValidationError } from '../src/user.ts';
 
@@ -27,6 +28,13 @@ function result(rows: UserRow[], rowCount: number | null = rows.length) {
 }
 
 describe('UserRepository.create', () => {
+  const newUser = (overrides: Partial<NewUser> = {}): NewUser => ({
+    email: 'user@example.com',
+    name: 'Taro',
+    password: 'password123',
+    ...overrides,
+  });
+
   it('重複が無ければ INSERT して挿入行を返す', async () => {
     const { db, query } = createDb();
     const row = makeRow();
@@ -34,20 +42,23 @@ describe('UserRepository.create', () => {
     query.mockResolvedValueOnce(result([])).mockResolvedValueOnce(result([row]));
     const repo = new UserRepository(db);
 
-    const created = await repo.create({ email: ' USER@Example.com ', name: ' Taro ' });
+    const created = await repo.create(newUser({ email: ' USER@Example.com ', name: ' Taro ' }));
 
     expect(created).toBe(row);
     expect(query).toHaveBeenCalledTimes(2);
-    // 正規化された値で INSERT されること。
-    expect(query.mock.calls[1]?.[1]).toEqual(['user@example.com', 'Taro', 'active']);
     expect(query.mock.calls[1]?.[0]).toMatch(/INSERT INTO users/);
+
+    // 正規化された値で INSERT され、パスワードは平文で渡らないこと。
+    const params = query.mock.calls[1]?.[1] ?? [];
+    expect(params.slice(0, 3)).toEqual(['user@example.com', 'Taro', 'active']);
+    expect(params[3]).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
   });
 
   it('入力が不正なら DB を触らずに ValidationError', async () => {
     const { db, query } = createDb();
     const repo = new UserRepository(db);
 
-    await expect(repo.create({ email: 'bad', name: 'Taro' })).rejects.toThrow(ValidationError);
+    await expect(repo.create(newUser({ email: 'bad' }))).rejects.toThrow(ValidationError);
     expect(query).not.toHaveBeenCalled();
   });
 
@@ -56,9 +67,7 @@ describe('UserRepository.create', () => {
     query.mockResolvedValueOnce(result([makeRow()]));
     const repo = new UserRepository(db);
 
-    await expect(repo.create({ email: 'user@example.com', name: 'Taro' })).rejects.toThrow(
-      /email already registered/,
-    );
+    await expect(repo.create(newUser())).rejects.toThrow(/email already registered/);
     expect(query).toHaveBeenCalledTimes(1);
   });
 
@@ -67,9 +76,7 @@ describe('UserRepository.create', () => {
     query.mockResolvedValueOnce(result([])).mockResolvedValueOnce(result([]));
     const repo = new UserRepository(db);
 
-    await expect(repo.create({ email: 'user@example.com', name: 'Taro' })).rejects.toThrow(
-      'INSERT returned no row',
-    );
+    await expect(repo.create(newUser())).rejects.toThrow('INSERT returned no row');
   });
 });
 
@@ -133,7 +140,7 @@ describe('UserRepository.list', () => {
     expect(page.nextCursor).toBeNull();
   });
 
-  it('次ページがあれば limit 件に切り詰めて nextCursor を返す', async () => {
+  it('次ページがあれば limit 件に切り詰め、(created_at, id) の複合カーソルを返す', async () => {
     const { db, query } = createDb();
     const rows = [
       makeRow({ id: 'a', created_at: new Date('2026-03-03T00:00:00.000Z') }),
@@ -145,18 +152,35 @@ describe('UserRepository.list', () => {
     const page = await new UserRepository(db).list({ limit: 2 });
 
     expect(page.items.map((r) => r.id)).toEqual(['a', 'b']);
-    // 最後に返した行の created_at が次のカーソルになる。
-    expect(page.nextCursor).toBe('2026-02-02T00:00:00.000Z');
+    // created_at だけだと同時刻の行を取りこぼすので id も持つ。
+    expect(decodeCursor(page.nextCursor as string)).toEqual({
+      created_at: '2026-02-02T00:00:00.000Z',
+      id: 'b',
+    });
   });
 
-  it('cursor 指定時は created_at < $1 で絞り込む', async () => {
+  it('cursor 指定時は (created_at, id) の行値比較で絞り込む', async () => {
     const { db, query } = createDb();
     query.mockResolvedValueOnce(result([]));
+    const cursor = encodeCursor({ created_at: '2026-02-02T00:00:00.000Z', id: 'b' });
 
-    await new UserRepository(db).list({ limit: 5, cursor: '2026-02-02T00:00:00.000Z' });
+    await new UserRepository(db).list({ limit: 5, cursor });
 
-    expect(query.mock.calls[0]?.[0]).toMatch(/created_at </);
-    expect(query.mock.calls[0]?.[1]).toEqual(['2026-02-02T00:00:00.000Z', 6]);
+    // ORDER BY と同じ組で比較していること。created_at 単独では不可。
+    expect(query.mock.calls[0]?.[0]).toMatch(/\(created_at, id\) < \(\$1::timestamptz, \$2::uuid\)/);
+    expect(query.mock.calls[0]?.[1]).toEqual(['2026-02-02T00:00:00.000Z', 'b', 6]);
+  });
+
+  it.each([
+    ['JSON として壊れている', 'broken!!'],
+    ['created_at が無い', encodeCursor({ id: 'b' })],
+    ['id が無い', encodeCursor({ created_at: '2026-02-02T00:00:00.000Z' })],
+    ['型が違う', encodeCursor({ created_at: 1, id: 2 })],
+  ])('cursor が不正なら InvalidCursorError で DB を触らない: %s', async (_label, cursor) => {
+    const { db, query } = createDb();
+
+    await expect(new UserRepository(db).list({ cursor })).rejects.toThrow(InvalidCursorError);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('cursor に null を渡した場合は cursor 無しとして扱う', async () => {

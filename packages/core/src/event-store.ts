@@ -6,37 +6,12 @@ import {
   type DynamoDBDocumentClient,
 } from '@aws-sdk/lib-dynamodb';
 
+import { decodeCursor, encodeCursor, InvalidCursorError, type CursorKey } from './cursor.ts';
 import type { EventItem, Page } from './types.ts';
 
 const DEFAULT_LIMIT = 50;
 
-type DynamoKey = Record<string, unknown>;
-
-/** LastEvaluatedKey を不透明なカーソル文字列に変換する。 */
-export function encodeCursor(key: DynamoKey): string {
-  return Buffer.from(JSON.stringify(key), 'utf8').toString('base64url');
-}
-
-/** カーソル文字列を LastEvaluatedKey に戻す。壊れている場合は null。 */
-export function decodeCursor(cursor: string): DynamoKey | null {
-  try {
-    const parsed: unknown = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as DynamoKey;
-  } catch {
-    return null;
-  }
-}
-
-/** カーソルが不正なときに投げられる。 */
-export class InvalidCursorError extends Error {
-  constructor(cursor: string) {
-    super(`invalid cursor: ${cursor}`);
-    this.name = 'InvalidCursorError';
-  }
-}
+type DynamoKey = CursorKey;
 
 export class EventStore {
   readonly #client: DynamoDBDocumentClient;

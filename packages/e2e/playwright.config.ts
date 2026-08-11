@@ -1,23 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { APP_PORT, BASE_URL, E2E_ENV } from './setup/env.ts';
+
 const isCI = process.env.CI === 'true' || process.env.CI === '1';
-
-/**
- * テスト対象アプリの URL。
- *
- * `E2E_BASE_URL` が指定されていればそのアプリに向ける（起動済みであること）。
- * 未指定なら、下の `webServer` がリポジトリ同梱のプレースホルダアプリを起動する。
- */
-export const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
-
-/**
- * 外部アプリを指定されていないので、こちらでプレースホルダを起動する必要があるか。
- * 実アプリに向けるときは `E2E_BASE_URL` を設定すればこのサーバーは起動しない。
- */
-const usePlaceholderApp = process.env.E2E_BASE_URL === undefined;
 
 /** global-setup が書き出すログイン済みセッションの保存先。 */
 export const STORAGE_STATE = '.auth/user.json';
+
+/**
+ * 外部で起動済みのアプリを指定されていなければ、こちらで起動する。
+ * `E2E_BASE_URL` を設定するとそのアプリに向き、webServer は起動しない。
+ */
+const startOwnServer = process.env.E2E_BASE_URL === undefined;
 
 export default defineConfig({
   testDir: './tests',
@@ -26,12 +20,19 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  fullyParallel: true,
+  // 全テストが1つの DB を共有するので、ファイル内は直列にする。
+  // 一覧やページングを見るテストが、別テストの作成・削除と競合するため。
+  // ファイル間は並列のままなので workers は効く。
+  fullyParallel: false,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
   workers: isCI ? 2 : undefined,
   reporter: isCI
-    ? [['list'], ['junit', { outputFile: '../../.test-result/e2e-junit.xml' }], ['html', { open: 'never' }]]
+    ? [
+        ['list'],
+        ['junit', { outputFile: '../../.test-result/e2e-junit.xml' }],
+        ['html', { open: 'never' }],
+      ]
     : [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: BASE_URL,
@@ -46,14 +47,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  // globalSetup より先に起動され、url が応答するまで待機する。
-  // ローカルで既に手動起動している場合はそれを使い回す。
-  webServer: usePlaceholderApp
+  // API と SPA を同一オリジンで配信するアプリ本体を起動する。
+  // DB の作り直しとシードは setup/prepare.ts が先に済ませている。
+  webServer: startOwnServer
     ? {
-        command: 'node fixtures/placeholder-app.mjs',
-        url: `${BASE_URL}/login`,
+        command: 'pnpm --filter @test/app start',
+        url: `${BASE_URL}/api/health`,
         reuseExistingServer: !isCI,
-        timeout: 30_000,
+        timeout: 60_000,
+        env: { ...E2E_ENV, PORT: String(APP_PORT) },
       }
     : undefined,
 });

@@ -7,12 +7,8 @@ import {
   type DynamoDBDocumentClient,
 } from '@aws-sdk/lib-dynamodb';
 
-import {
-  decodeCursor,
-  encodeCursor,
-  EventStore,
-  InvalidCursorError,
-} from '../src/event-store.ts';
+import { decodeCursor, encodeCursor, InvalidCursorError } from '../src/cursor.ts';
+import { EventStore } from '../src/event-store.ts';
 import type { EventItem } from '../src/types.ts';
 
 const TABLE = 'events';

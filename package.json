@@ -6,27 +6,38 @@
   "packageManager": "pnpm@10.19.0",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "pnpm --filter @test/web build && pnpm dev:seed && pnpm --filter @test/app dev",
+    "dev:seed": "pnpm --filter @test/app seed:dev",
+    "dev:web": "pnpm --filter @test/web dev",
+    "dev:api": "pnpm --filter @test/app dev",
     "test": "pnpm run test:ut",
     "test:ut": "vitest run --config vitest.config.ts",
     "test:ut:watch": "vitest --config vitest.config.ts",
     "test:it": "vitest run --config vitest.config.it.ts",
-    "test:e2e": "pnpm --filter @test/e2e test",
+    "test:e2e": "pnpm --filter @test/web build && pnpm --filter @test/e2e test",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d --wait postgres localstack && docker compose -f docker/docker-compose.yml run --rm --no-deps flyway",
     "docker:down": "docker compose -f docker/docker-compose.yml down -v",
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@aws-sdk/client-dynamodb": "^3.717.0",
     "@aws-sdk/lib-dynamodb": "^3.717.0",
+    "@test/app": "workspace:*",
     "@test/core": "workspace:*",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
-    "pg": "^8.13.1",
     "@vitest/coverage-v8": "^3.0.5",
+    "pg": "^8.13.1",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.0",
+    "hono": "^4.13.1"
   }
 }

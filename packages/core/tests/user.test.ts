@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { NewUser } from '../src/types.ts';
 import {
   canTransition,
   normalizeEmail,
@@ -29,24 +30,31 @@ describe('ValidationError', () => {
 });
 
 describe('validateNewUser', () => {
-  it('正規化した値を返し、status を省略すると active になる', () => {
-    const result = validateNewUser({ email: ' USER@Example.com ', name: '  Taro  ' });
+  /** 妥当な入力を作り、検証したい項目だけ差し替える。 */
+  const input = (overrides: Partial<NewUser> = {}): NewUser => ({
+    email: 'user@example.com',
+    name: 'Taro',
+    password: 'password123',
+    ...overrides,
+  });
 
-    expect(result).toEqual({ email: 'user@example.com', name: 'Taro', status: 'active' });
+  it('正規化した値を返し、status を省略すると active になる', () => {
+    const result = validateNewUser(input({ email: ' USER@Example.com ', name: '  Taro  ' }));
+
+    expect(result).toEqual({
+      email: 'user@example.com',
+      name: 'Taro',
+      password: 'password123',
+      status: 'active',
+    });
   });
 
   it('status を指定した場合はその値を使う', () => {
-    const result = validateNewUser({
-      email: 'user@example.com',
-      name: 'Taro',
-      status: 'suspended',
-    });
-
-    expect(result.status).toBe('suspended');
+    expect(validateNewUser(input({ status: 'suspended' })).status).toBe('suspended');
   });
 
   it('email が空文字（空白のみ含む）なら ValidationError', () => {
-    expect(() => validateNewUser({ email: '   ', name: 'Taro' })).toThrowError(
+    expect(() => validateNewUser(input({ email: '   ' }))).toThrowError(
       new ValidationError('email', 'email is required'),
     );
   });
@@ -54,27 +62,37 @@ describe('validateNewUser', () => {
   it.each([['no-at-mark'], ['no@domain'], ['sp ace@example.com'], ['a@b@example.com']])(
     'email の形式が不正なら ValidationError: %s',
     (email) => {
-      expect(() => validateNewUser({ email, name: 'Taro' })).toThrow(ValidationError);
-      expect(() => validateNewUser({ email, name: 'Taro' })).toThrow(/invalid email format/);
+      expect(() => validateNewUser(input({ email }))).toThrow(ValidationError);
+      expect(() => validateNewUser(input({ email }))).toThrow(/invalid email format/);
     },
   );
 
   it('name が空文字（空白のみ含む）なら ValidationError', () => {
-    expect(() => validateNewUser({ email: 'user@example.com', name: '  ' })).toThrowError(
+    expect(() => validateNewUser(input({ name: '  ' }))).toThrowError(
       new ValidationError('name', 'name is required'),
     );
   });
 
   it('name が 100 文字を超えたら ValidationError', () => {
-    expect(() =>
-      validateNewUser({ email: 'user@example.com', name: 'a'.repeat(101) }),
-    ).toThrow(/100 characters or fewer/);
+    expect(() => validateNewUser(input({ name: 'a'.repeat(101) }))).toThrow(
+      /100 characters or fewer/,
+    );
   });
 
   it('name がちょうど 100 文字なら通る', () => {
     const name = 'a'.repeat(100);
 
-    expect(validateNewUser({ email: 'user@example.com', name }).name).toBe(name);
+    expect(validateNewUser(input({ name })).name).toBe(name);
+  });
+
+  it('password が 8 文字未満なら ValidationError', () => {
+    expect(() => validateNewUser(input({ password: '1234567' }))).toThrowError(
+      new ValidationError('password', 'password must be at least 8 characters'),
+    );
+  });
+
+  it('password はちょうど 8 文字で通り、空白も trim されない', () => {
+    expect(validateNewUser(input({ password: '  pass  ' })).password).toBe('  pass  ');
   });
 });
 

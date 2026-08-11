@@ -12,7 +12,7 @@ export default defineConfig({
   test: {
     name: 'ut',
     // 各パッケージの tests/ 配下のみを UT とみなす。
-    include: ['packages/*/tests/**/*.test.ts'],
+    include: ['packages/*/tests/**/*.test.ts', 'packages/*/tests/**/*.test.tsx'],
     exclude: ['**/node_modules/**', '**/dist/**', 'packages/e2e/**', 'it-tests/**'],
     environment: 'node',
     globals: false,
@@ -26,19 +26,21 @@ export default defineConfig({
       reportsDirectory: 'coverage/ut',
       reporter: isCI ? ['text-summary', 'lcov', 'json-summary'] : ['text', 'html'],
       // カバレッジ母集団はプロダクトコードのみ。テストコードは含めない。
-      include: ['packages/*/src/**/*.ts'],
+      // React の画面も対象なので .tsx を含める。
+      include: ['packages/*/src/**/*.ts', 'packages/*/src/**/*.tsx'],
       /**
        * 除外できるのは以下の4種類だけ。ここに他のファイルを足さないこと。
-       *   src/index.ts  … エントリポイント（再エクスポートのみ）
-       *   src/types.ts  … 型定義（実行時コードなし）
-       *   src/config.ts … 設定値の読み出し
-       *   src/db.ts     … DB / AWS クライアントの接続初期化
+       *   src/index.ts(x) … エントリポイント（再エクスポート / マウントのみ）
+       *   src/types.ts    … 型定義（実行時コードなし）
+       *   src/config.ts   … 設定値の読み出し
+       *   src/db.ts       … DB / AWS クライアントの接続初期化
        * ロジックを含むファイルを除外したくなったら、そのロジックを
-       * 別ファイルへ切り出してテストする。監査は `pnpm ut:audit` 相当の
+       * 別ファイルへ切り出してテストする。監査は
        * .claude/commands/ut-run.md を参照。
        */
       exclude: [
         'packages/*/src/index.ts',
+        'packages/*/src/index.tsx',
         'packages/*/src/types.ts',
         'packages/*/src/config.ts',
         'packages/*/src/db.ts',

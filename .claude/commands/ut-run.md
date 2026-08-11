@@ -22,13 +22,20 @@ UT は Docker も DB も使わないので、事前準備は不要。
 | 許可されるパターン | 理由 |
 |---|---|
 | `packages/*/src/index.ts` | エントリポイント（再エクスポートのみ） |
+| `packages/*/src/index.tsx` | ブラウザ側エントリポイント（マウントのみ） |
 | `packages/*/src/types.ts` | 型定義（実行時コードなし） |
 | `packages/*/src/config.ts` | 設定値の読み出し |
 | `packages/*/src/db.ts` | DB / AWS クライアントの接続初期化 |
 
 **これ以外のエントリが1つでもあれば違反として報告する。**
-`coverage.include` が `packages/*/src/**/*.ts` から狭められている場合、
+`coverage.include` が `packages/*/src/**/*.ts` と
+`packages/*/src/**/*.tsx` の2つから狭められている場合、
 それも実質的な除外なので同様に違反として扱う。
+
+`src/` の外に置かれたプロダクトコードも実質的な除外にあたる。
+現状で認められているのは `packages/app/server.ts` だけで、
+これは「import しただけでポートを掴まない」ためにそうしている。
+`src/` の外に新しいロジックが増えていたら違反として報告する。
 
 違反を見つけたら、次を報告する。
 
@@ -50,6 +57,8 @@ exclude を増やす方向の提案はしない。
 - `types.ts` に実行時コード（`const`、関数、`enum`、クラス）がある
 - `config.ts` に条件分岐や値の加工がある（`??` による既定値までは可）
 - `db.ts` に接続オブジェクトの生成以外の処理がある
+- `index.tsx` にマウント以外の処理がある
+- `packages/app/server.ts` に起動と静的配信の設定以外の処理がある
 
 ## Step 4. 報告
 

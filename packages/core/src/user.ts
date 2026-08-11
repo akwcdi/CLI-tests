@@ -1,6 +1,7 @@
 import type { NewUser, UserStatus } from './types.ts';
 
 const MAX_NAME_LENGTH = 100;
+const MIN_PASSWORD_LENGTH = 8;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** 入力値が業務ルールを満たさないときに投げられる。 */
@@ -40,7 +41,15 @@ export function validateNewUser(input: NewUser): Required<NewUser> {
     throw new ValidationError('name', `name must be ${MAX_NAME_LENGTH} characters or fewer`);
   }
 
-  return { email, name, status: input.status ?? 'active' };
+  // パスワードは前後の空白も意味を持つので trim しない。
+  if (input.password.length < MIN_PASSWORD_LENGTH) {
+    throw new ValidationError(
+      'password',
+      `password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    );
+  }
+
+  return { email, name, password: input.password, status: input.status ?? 'active' };
 }
 
 /** ステータス遷移が許可されているかを判定する。同一ステータスへの遷移は許可しない。 */
