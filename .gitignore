@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.test-result/
+*.tsbuildinfo
+
+# Playwright
+playwright-report/
+test-results/
+.auth/
+
+.DS_Store
+.env
+.env.local

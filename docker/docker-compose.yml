@@ -1,0 +1,66 @@
+name: test-it
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: it-postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: db
+      # 決定的なソート順にするため、テスト環境のロケールを固定する。
+      LANG: C
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U user -d db']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  # PostgreSQL の healthcheck 通過後に起動し、開発用 DB `db` を最新まで進める。
+  # IT 用の `db_test` は it-tests/setup/global-setup.ts が
+  # `docker compose run --rm flyway ... migrate` で作り直す。
+  flyway:
+    image: flyway/flyway:11-alpine
+    container_name: it-flyway
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./flyway/sql:/flyway/sql:ro
+    command: >
+      -url=jdbc:postgresql://postgres:5432/db
+      -user=user
+      -password=pass
+      -connectRetries=20
+      -baselineOnMigrate=true
+      migrate
+    restart: 'no'
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: it-localstack
+    environment:
+      SERVICES: dynamodb
+      DEBUG: '0'
+      AWS_DEFAULT_REGION: ap-northeast-1
+      # DynamoDB のデータをコンテナ再起動で持ち越さない。
+      PERSISTENCE: '0'
+    ports:
+      - '4566:4566'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -sf http://localhost:4566/_localstack/health | grep -q ''"dynamodb": "available"'''
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  postgres-data:

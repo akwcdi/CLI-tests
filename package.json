@@ -1,0 +1,32 @@
+{
+  "name": "test-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.19.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm run test:ut",
+    "test:ut": "vitest run --config vitest.config.ts",
+    "test:ut:watch": "vitest --config vitest.config.ts",
+    "test:it": "vitest run --config vitest.config.it.ts",
+    "test:e2e": "pnpm --filter @test/e2e test",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d --wait postgres localstack && docker compose -f docker/docker-compose.yml up flyway",
+    "docker:down": "docker compose -f docker/docker-compose.yml down -v",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.717.0",
+    "@aws-sdk/lib-dynamodb": "^3.717.0",
+    "@test/core": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "pg": "^8.13.1",
+    "@vitest/coverage-v8": "^3.0.5",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
+  }
+}
