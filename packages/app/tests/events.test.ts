@@ -50,6 +50,10 @@ describe('EVENT_TYPES', () => {
       statusChanged: 'user.status_changed',
       deleted: 'user.deleted',
       loggedIn: 'user.logged_in',
+      requestCreated: 'request.created',
+      requestSubmitted: 'request.submitted',
+      requestApproved: 'request.approved',
+      requestRejected: 'request.rejected',
     });
   });
 });

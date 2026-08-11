@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { hashPassword, UserNotFoundError, ValidationError, type UserRow } from '@test/core';
+import {
+  hashPassword,
+  RequestNotFoundError,
+  UserNotFoundError,
+  ValidationError,
+  type RequestWithNames,
+  type UserRow,
+} from '@test/core';
 
 import { createApp } from '../src/app.ts';
 import type { AuthPort, Deps, EventsPort, RequestsPort, UsersPort } from '../src/types.ts';
@@ -479,6 +486,239 @@ describe('認証済みルート', () => {
 
       expect(res.status).toBe(400);
       await expect(res.json()).resolves.toMatchObject({ error: { code: 'invalid_cursor' } });
+    });
+  });
+});
+
+const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+
+function makeRequest(overrides: Partial<RequestWithNames> = {}): RequestWithNames {
+  return {
+    id: REQUEST_ID,
+    title: '備品購入',
+    amount: 12000,
+    status: 'draft',
+    requester_id: USER_ID,
+    requester_name: 'Taro',
+    decided_by: null,
+    decider_name: null,
+    created_at: new Date('2026-01-01T00:00:00.000Z'),
+    decided_at: null,
+    ...overrides,
+  };
+}
+
+describe('申請 API', () => {
+  let ctx: ReturnType<typeof createDeps>;
+
+  const postJson = (body: unknown) =>
+    ({
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `session=${TOKEN}` },
+      body: JSON.stringify(body),
+    }) satisfies RequestInit;
+
+  beforeEach(() => {
+    ctx = createDeps();
+    ctx.auth.findUserBySession.mockResolvedValue(makeUser());
+  });
+
+  describe('GET /api/overview', () => {
+    it('2アプリぶんの件数を1往復で返す', async () => {
+      ctx.users.countAll.mockResolvedValue(12);
+      ctx.requests.countByStatus.mockResolvedValue(3);
+
+      const res = await ctx.app.request('/api/overview', authed);
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({ users: 12, pendingRequests: 3 });
+      expect(ctx.requests.countByStatus).toHaveBeenCalledWith('pending');
+    });
+
+    it('未認証なら 401', async () => {
+      const { app } = createDeps();
+
+      expect((await app.request('/api/overview')).status).toBe(401);
+    });
+  });
+
+  describe('GET /api/requests', () => {
+    it('limit / cursor / status を core に渡す', async () => {
+      ctx.requests.list.mockResolvedValue({ items: [], nextCursor: null });
+
+      const res = await ctx.app.request('/api/requests?limit=3&cursor=c1&status=pending', authed);
+
+      expect(res.status).toBe(200);
+      expect(ctx.requests.list).toHaveBeenCalledWith({
+        limit: 3,
+        cursor: 'c1',
+        status: 'pending',
+      });
+    });
+
+    it('クエリ省略時は絞り込まない', async () => {
+      ctx.requests.list.mockResolvedValue({ items: [makeRequest()], nextCursor: null });
+
+      await ctx.app.request('/api/requests', authed);
+
+      expect(ctx.requests.list).toHaveBeenCalledWith({
+        limit: undefined,
+        cursor: null,
+        status: undefined,
+      });
+    });
+
+    it('status が不正なら 400', async () => {
+      const res = await ctx.app.request('/api/requests?status=unknown', authed);
+
+      expect(res.status).toBe(400);
+      expect(ctx.requests.list).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/requests', () => {
+    it('申請者をサインイン中の本人にして作成し、イベントを記録する', async () => {
+      ctx.requests.create.mockResolvedValue(makeRequest());
+
+      const res = await ctx.app.request(
+        '/api/requests',
+        // クライアントが requesterId を送っても無視されること。
+        postJson({ title: '備品購入', amount: 12000, requesterId: OTHER_ID }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(ctx.requests.create).toHaveBeenCalledWith({
+        title: '備品購入',
+        amount: 12000,
+        requesterId: USER_ID,
+      });
+      expect(ctx.events.append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: REQUEST_ID,
+          type: 'request.created',
+          payload: { title: '備品購入', amount: 12000 },
+        }),
+      );
+    });
+
+    it('金額が数値でなければ 400', async () => {
+      const res = await ctx.app.request('/api/requests', postJson({ title: 'x', amount: '12000' }));
+
+      expect(res.status).toBe(400);
+      expect(ctx.requests.create).not.toHaveBeenCalled();
+    });
+
+    it('core の ValidationError は 400 に変換される', async () => {
+      ctx.requests.create.mockRejectedValue(new ValidationError('amount', '金額は1以上で入力してください'));
+
+      const res = await ctx.app.request('/api/requests', postJson({ title: 'x', amount: 0 }));
+
+      expect(res.status).toBe(400);
+      expect(ctx.events.append).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/requests/:id', () => {
+    it('見つかれば 200', async () => {
+      ctx.requests.findById.mockResolvedValue(makeRequest());
+
+      const res = await ctx.app.request(`/api/requests/${REQUEST_ID}`, authed);
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({ request: { id: REQUEST_ID } });
+    });
+
+    it('見つからなければ 404', async () => {
+      ctx.requests.findById.mockResolvedValue(null);
+
+      const res = await ctx.app.request(`/api/requests/${REQUEST_ID}`, authed);
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /api/requests/:id/submit', () => {
+    it('提出してイベントを記録する', async () => {
+      ctx.requests.submit.mockResolvedValue(makeRequest({ status: 'pending' }));
+
+      const res = await ctx.app.request(`/api/requests/${REQUEST_ID}/submit`, {
+        method: 'POST',
+        ...authed,
+      });
+
+      expect(res.status).toBe(200);
+      expect(ctx.requests.submit).toHaveBeenCalledWith(REQUEST_ID);
+      expect(ctx.events.append).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'request.submitted' }),
+      );
+    });
+
+    it('存在しなければ 404 でイベントも残さない', async () => {
+      ctx.requests.submit.mockRejectedValue(new RequestNotFoundError(REQUEST_ID));
+
+      const res = await ctx.app.request(`/api/requests/${REQUEST_ID}/submit`, {
+        method: 'POST',
+        ...authed,
+      });
+
+      expect(res.status).toBe(404);
+      expect(ctx.events.append).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /api/requests/:id/decision', () => {
+    it.each([
+      ['approved', 'request.approved'],
+      ['rejected', 'request.rejected'],
+    ] as const)('%s なら %s を記録する', async (decision, eventType) => {
+      ctx.requests.decide.mockResolvedValue(makeRequest({ status: decision }));
+
+      const res = await ctx.app.request(
+        `/api/requests/${REQUEST_ID}/decision`,
+        postJson({ decision }),
+      );
+
+      expect(res.status).toBe(200);
+      // 決裁者はサインイン中の本人。
+      expect(ctx.requests.decide).toHaveBeenCalledWith(REQUEST_ID, decision, USER_ID);
+      expect(ctx.events.append).toHaveBeenCalledWith(
+        expect.objectContaining({ type: eventType, payload: { decidedBy: USER_ID } }),
+      );
+    });
+
+    it('決裁値が不正なら 400', async () => {
+      const res = await ctx.app.request(
+        `/api/requests/${REQUEST_ID}/decision`,
+        postJson({ decision: 'maybe' }),
+      );
+
+      expect(res.status).toBe(400);
+      expect(ctx.requests.decide).not.toHaveBeenCalled();
+    });
+
+    it('自分の申請なら core が弾いて 400', async () => {
+      ctx.requests.decide.mockRejectedValue(
+        new ValidationError('deciderId', '自分が出した申請は決裁できません'),
+      );
+
+      const res = await ctx.app.request(
+        `/api/requests/${REQUEST_ID}/decision`,
+        postJson({ decision: 'approved' }),
+      );
+
+      expect(res.status).toBe(400);
+      expect(ctx.events.append).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/requests/:id/events', () => {
+    it('申請のイベント一覧を返す', async () => {
+      ctx.events.listByUser.mockResolvedValue({ items: [], nextCursor: null });
+
+      const res = await ctx.app.request(`/api/requests/${REQUEST_ID}/events?limit=2`, authed);
+
+      expect(res.status).toBe(200);
+      expect(ctx.events.listByUser).toHaveBeenCalledWith(REQUEST_ID, { limit: 2, cursor: null });
     });
   });
 });
