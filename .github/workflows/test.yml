@@ -1,0 +1,131 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'E2E も実行する（対象アプリが必要）'
+        type: boolean
+        default: false
+
+# 同じブランチへの連続 push では古い実行を打ち切る。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # UT は Docker を待たないので数秒で結果が返る。IT とは並列に走らせる。
+  ut:
+    name: UT
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # GitHub Actions は CI=true を自動で設定するので、
+      # JUnit XML の出力とカバレッジ 100% 閾値がそのまま有効になる。
+      - name: Run UT
+        run: pnpm test:ut
+
+      - name: Upload UT results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ut-results
+          path: |
+            .test-result/ut-junit.xml
+            coverage/ut
+          if-no-files-found: warn
+          retention-days: 7
+
+  it:
+    name: IT
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # ローカルと同じ compose を使う。global-setup.ts が
+      # `docker compose run --rm flyway` を呼ぶため、compose ネットワークが要る。
+      - name: Start containers
+        run: pnpm docker:up
+
+      - name: Run IT
+        run: pnpm test:it
+
+      - name: Dump container logs
+        if: failure()
+        run: docker compose -f docker/docker-compose.yml logs --no-color --tail=200
+
+      - name: Upload IT results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: it-results
+          path: .test-result/it-junit.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Stop containers
+        if: always()
+        run: pnpm docker:down
+
+  # 実アプリがまだ無く、global-setup.ts のセレクタもスタブ前提のため、
+  # 既定では走らせない。手動実行で run_e2e にチェックを入れたときだけ動く。
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_e2e
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @test/e2e exec playwright install --with-deps chromium
+
+      # TODO: テスト対象アプリの起動ステップをここに追加する。
+      #       E2E_BASE_URL で向き先を変えられる（既定 http://localhost:3000）。
+
+      - name: Run E2E
+        run: pnpm test:e2e
+
+      - name: Upload E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            .test-result/e2e-junit.xml
+            packages/e2e/playwright-report
+          if-no-files-found: warn
+          retention-days: 7
