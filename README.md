@@ -95,9 +95,30 @@ Chromium のみ。`packages/e2e/global-setup.ts` が起動時に1度だけログ
 セッションを `.auth/user.json` に保存して全テストで使い回す。
 CI では `retries: 1` / `workers: 2`。
 
-**アプリが起動している必要がある**（既定 `http://localhost:3000`、
-`E2E_BASE_URL` で変更可）。ログイン画面のセレクタは
-実際の画面に合わせて `global-setup.ts` を調整すること。
+### テスト対象アプリ
+
+`E2E_BASE_URL` の有無で向き先が変わる。
+
+| `E2E_BASE_URL` | 挙動 |
+|---|---|
+| 未設定（既定） | `packages/e2e/fixtures/placeholder-app.mjs` を `webServer` が自動起動する |
+| 設定あり | そのアプリに向ける。プレースホルダは起動しない（アプリは起動済みであること） |
+
+```bash
+E2E_BASE_URL=http://localhost:8080 pnpm test:e2e
+```
+
+**プレースホルダアプリはテスト対象ではない。**
+ログイン → セッション Cookie → 保護されたページ という最小の形しか持たず、
+E2E の足場（設定・globalSetup・storageState の受け渡し）が
+壊れていないことを CI で守るためだけに置いてある。
+
+実アプリができたら:
+
+1. `E2E_BASE_URL` を実アプリに向ける（CI ならワークフローに `env` を追加）
+2. `global-setup.ts` のセレクタと `waitForURL` を実際の画面に合わせる
+3. `tests/dashboard.spec.ts` を実際の検証に置き換える
+4. `fixtures/placeholder-app.mjs` を削除する
 
 ## CI
 

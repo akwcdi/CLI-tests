@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test:headed": "playwright test --headed",
     "report": "playwright show-report",
     "install:browser": "playwright install --with-deps chromium"
