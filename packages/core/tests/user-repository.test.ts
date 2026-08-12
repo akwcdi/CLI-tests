@@ -270,3 +270,20 @@ describe('UserRepository.deleteById', () => {
     expect(query.mock.calls[0]?.[0]).toMatch(/DELETE FROM users/);
   });
 });
+
+describe('UserRepository.countAll', () => {
+  it('総件数を返す', async () => {
+    const { db, query } = createDb();
+    query.mockResolvedValueOnce({ rows: [{ n: 12 }], rowCount: 1 } as never);
+
+    await expect(new UserRepository(db).countAll()).resolves.toBe(12);
+    expect(query.mock.calls[0]?.[0]).toMatch(/count\(\*\)/);
+  });
+
+  it('行が無ければ 0', async () => {
+    const { db, query } = createDb();
+    query.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
+
+    await expect(new UserRepository(db).countAll()).resolves.toBe(0);
+  });
+});

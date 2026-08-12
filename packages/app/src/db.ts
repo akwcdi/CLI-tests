@@ -10,6 +10,7 @@ import {
   createDynamoDocumentClient,
   createPool,
   EventStore,
+  RequestRepository,
   UserRepository,
 } from '@test/core';
 
@@ -23,5 +24,6 @@ export function createDeps(): Deps {
     users: new UserRepository(pool),
     auth: new AuthRepository(pool),
     events: new EventStore(docClient, config.eventsTableName),
+    requests: new RequestRepository(pool),
   };
 }

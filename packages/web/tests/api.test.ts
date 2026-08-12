@@ -202,3 +202,104 @@ describe('api.listEvents', () => {
     expect(lastCall()[0]).toBe('/api/users/u1/events');
   });
 });
+
+const REQ = {
+  id: 'r1',
+  title: '備品購入',
+  amount: 12000,
+  status: 'draft' as const,
+  requester_id: 'u1',
+  requester_name: 'Taro',
+  decided_by: null,
+  decider_name: null,
+  created_at: '2026-01-01T00:00:00.000Z',
+  decided_at: null,
+};
+
+describe('api.overview', () => {
+  it('指標を取得する', async () => {
+    fetchMock.mockResolvedValue(ok({ users: 12, pendingRequests: 3 }));
+
+    await expect(api.overview()).resolves.toEqual({ users: 12, pendingRequests: 3 });
+    expect(lastCall()[0]).toBe('/api/overview');
+  });
+});
+
+describe('api.listRequests', () => {
+  it('引数なしならクエリを付けない', async () => {
+    fetchMock.mockResolvedValue(ok({ items: [], nextCursor: null }));
+
+    await api.listRequests();
+
+    expect(lastCall()[0]).toBe('/api/requests');
+  });
+
+  it('limit / cursor / status をクエリにする', async () => {
+    fetchMock.mockResolvedValue(ok({ items: [REQ], nextCursor: 'c1' }));
+
+    await expect(api.listRequests({ limit: 5, cursor: 'c0', status: 'pending' })).resolves.toEqual({
+      items: [REQ],
+      nextCursor: 'c1',
+    });
+    expect(lastCall()[0]).toBe('/api/requests?limit=5&cursor=c0&status=pending');
+  });
+
+  it('cursor が null ならクエリに載せない', async () => {
+    fetchMock.mockResolvedValue(ok({ items: [], nextCursor: null }));
+
+    await api.listRequests({ limit: 5, cursor: null });
+
+    expect(lastCall()[0]).toBe('/api/requests?limit=5');
+  });
+});
+
+describe('api.createRequest', () => {
+  it('POST して作成された申請を返す', async () => {
+    fetchMock.mockResolvedValue(ok({ request: REQ }, 201));
+
+    await expect(api.createRequest({ title: '備品購入', amount: 12000 })).resolves.toEqual(REQ);
+
+    const [path, init] = lastCall();
+    expect(path).toBe('/api/requests');
+    expect(JSON.parse(String(init?.body))).toEqual({ title: '備品購入', amount: 12000 });
+  });
+});
+
+describe('api.getRequest', () => {
+  it('id を URL に埋める', async () => {
+    fetchMock.mockResolvedValue(ok({ request: REQ }));
+
+    await expect(api.getRequest('r1')).resolves.toEqual(REQ);
+    expect(lastCall()[0]).toBe('/api/requests/r1');
+  });
+});
+
+describe('api.submitRequest', () => {
+  it('POST で提出する', async () => {
+    fetchMock.mockResolvedValue(ok({ request: { ...REQ, status: 'pending' } }));
+
+    await expect(api.submitRequest('r1')).resolves.toMatchObject({ status: 'pending' });
+    expect(lastCall()).toMatchObject(['/api/requests/r1/submit', { method: 'POST' }]);
+  });
+});
+
+describe('api.decideRequest', () => {
+  it.each([['approved'], ['rejected']] as const)('%s を送る', async (decision) => {
+    fetchMock.mockResolvedValue(ok({ request: { ...REQ, status: decision } }));
+
+    await expect(api.decideRequest('r1', decision)).resolves.toMatchObject({ status: decision });
+
+    const [path, init] = lastCall();
+    expect(path).toBe('/api/requests/r1/decision');
+    expect(JSON.parse(String(init?.body))).toEqual({ decision });
+  });
+});
+
+describe('api.listRequestEvents', () => {
+  it('申請のイベントを取得する', async () => {
+    fetchMock.mockResolvedValue(ok({ items: [], nextCursor: null }));
+
+    await expect(api.listRequestEvents('r1')).resolves.toEqual({ items: [], nextCursor: null });
+    expect(lastCall()[0]).toBe('/api/requests/r1/events');
+  });
+});

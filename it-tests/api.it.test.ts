@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { AuthRepository, EventStore, UserRepository } from '@test/core';
+import { AuthRepository, EventStore, RequestRepository, UserRepository } from '@test/core';
 import { createApp } from '@test/app';
 
 import { DEFAULT_PASSWORD, insertUser } from './factories/user.ts';
@@ -26,6 +26,7 @@ describe('API (PostgreSQL + DynamoDB)', () => {
       users: new UserRepository(db),
       auth: new AuthRepository(db),
       events: new EventStore(getDocClient(), eventsTableName()),
+      requests: new RequestRepository(db),
     });
   };
 
@@ -233,6 +234,94 @@ describe('API (PostgreSQL + DynamoDB)', () => {
         targetSession.token,
       ]);
       expect(left.rows).toEqual([]);
+    });
+  });
+
+  describe('申請', () => {
+    /** 申請者としてログインし、下書きを1件作って id を返す。 */
+    async function createDraft(cookie: string): Promise<string> {
+      const res = await app().request(
+        '/api/requests',
+        json({ title: '備品購入', amount: 12000 }, cookie),
+      );
+      expect(res.status).toBe(201);
+      const body = (await res.json()) as { request: { id: string } };
+      return body.request.id;
+    }
+
+    /**
+     * 決裁の要は「申請者は決裁できない」の一点だけで、ロール列は無い。
+     * 他人の下書きを提出できると提出者を詐称でき、そのまま自分で承認して
+     * 一周できてしまう。HTTP 経由でその経路が塞がっていることを見る。
+     */
+    it('他人の下書きは提出できず、状態も動かない', async () => {
+      await insertUser({ email: 'requester@example.com' });
+      await insertUser({ email: 'attacker@example.com' });
+      const requesterCookie = await login('requester@example.com');
+      const attackerCookie = await login('attacker@example.com');
+      const id = await createDraft(requesterCookie);
+
+      const res = await app().request(`/api/requests/${id}/submit`, {
+        method: 'POST',
+        headers: { cookie: attackerCookie },
+      });
+
+      expect(res.status).toBe(400);
+      const detail = await app().request(`/api/requests/${id}`, {
+        headers: { cookie: requesterCookie },
+      });
+      const body = (await detail.json()) as { request: { status: string } };
+      expect(body.request.status).toBe('draft');
+    });
+
+    it('本人が提出すれば pending になり、別の担当者が承認できる', async () => {
+      await insertUser({ email: 'requester@example.com', name: '申請 太郎' });
+      await insertUser({ email: 'decider@example.com' });
+      const requesterCookie = await login('requester@example.com');
+      const deciderCookie = await login('decider@example.com');
+      const id = await createDraft(requesterCookie);
+
+      await expect(
+        app().request(`/api/requests/${id}/submit`, {
+          method: 'POST',
+          headers: { cookie: requesterCookie },
+        }),
+      ).resolves.toMatchObject({ status: 200 });
+
+      const decided = await app().request(
+        `/api/requests/${id}/decision`,
+        json({ decision: 'approved' }, deciderCookie),
+      );
+
+      expect(decided.status).toBe(200);
+      const body = (await decided.json()) as {
+        request: { status: string; requester_name: string };
+      };
+      expect(body.request.status).toBe('approved');
+      expect(body.request.requester_name).toBe('申請 太郎');
+    });
+
+    it('申請者を削除しても申請は残り、申請者名だけが消える', async () => {
+      await insertUser({ email: 'admin@example.com' });
+      const requester = await insertUser({ email: 'requester@example.com' });
+      const adminCookie = await login('admin@example.com');
+      const requesterCookie = await login('requester@example.com');
+      const id = await createDraft(requesterCookie);
+
+      await expect(
+        app().request(`/api/users/${requester.id}`, {
+          method: 'DELETE',
+          headers: { cookie: adminCookie },
+        }),
+      ).resolves.toMatchObject({ status: 204 });
+
+      const detail = await app().request(`/api/requests/${id}`, { headers: { cookie: adminCookie } });
+      expect(detail.status).toBe(200);
+      const body = (await detail.json()) as {
+        request: { requester_id: string | null; requester_name: string | null };
+      };
+      expect(body.request.requester_id).toBeNull();
+      expect(body.request.requester_name).toBeNull();
     });
   });
 });

@@ -1,6 +1,6 @@
 import { ValidationError } from '@test/core';
 
-import type { UserStatus } from '@test/core';
+import type { RequestStatus, UserStatus } from '@test/core';
 
 /**
  * リクエストの読み取りと検証。
@@ -70,4 +70,39 @@ export function readLimit(raw: string | undefined): number | undefined {
 /** クエリの cursor。未指定なら null（先頭ページ）。 */
 export function readCursor(raw: string | undefined): string | null {
   return raw ?? null;
+}
+
+/** 申請の決裁値を検証して取り出す。 */
+export function readDecision(
+  body: Record<string, unknown>,
+  field: string,
+): 'approved' | 'rejected' {
+  const value = body[field];
+  if (value !== 'approved' && value !== 'rejected') {
+    throw new ValidationError(field, `${field} must be "approved" or "rejected"`);
+  }
+  return value;
+}
+
+const REQUEST_STATUSES: readonly RequestStatus[] = ['draft', 'pending', 'approved', 'rejected'];
+
+/** 一覧の絞り込み。未指定なら undefined（絞り込まない）。 */
+export function readRequestStatus(raw: string | undefined): RequestStatus | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  const found = REQUEST_STATUSES.find((status) => status === raw);
+  if (found === undefined) {
+    throw new ValidationError('status', 'status の値が不正です');
+  }
+  return found;
+}
+
+/** 金額。文字列や小数、Infinity を弾く。 */
+export function readAmount(body: Record<string, unknown>, field: string): number {
+  const value = body[field];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new ValidationError(field, `${field} must be a number`);
+  }
+  return value;
 }

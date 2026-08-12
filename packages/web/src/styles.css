@@ -1,0 +1,1056 @@
+/*
+ * 社内オペレーション基盤のデザインシステム。
+ *
+ * 前提: 担当者が一日中開いたまま使う業務画面。派手さより、状態が一目で
+ * 判別できることと、長時間見ても疲れないことを優先する。
+ *
+ * 下敷きにしたのは帳簿と稟議書。担当者がこの仕事をするとき頭の中にある
+ * 道具立てをそのまま画面の語彙にした。決めごとは4つ。
+ *
+ * 1. 帳簿の紙 — 淡い緑がかった紙に、行ごとの薄い縞。数字の列を一日中
+ *    追うために生まれた紙で、白地より目が滑らない。面は白く塗らない。
+ *
+ * 2. 綴じ代 — 表の左端に縦罫を1本引いて余白を作り、状態の印はすべて
+ *    そこに入れる。どの画面でも状態を読む場所が左端に固定される。
+ *    詳細画面の経過欄は、この余白を引き伸ばしたものにほかならない。
+ *    ランチャーのカードでは、同じ印が背に貼った付箋の形で出る。
+ *
+ * 3. 状態は色ではなく形 — 余白の印は、空欄（細罫）・付箋（旗）・
+ *    実線・二重線の4つ。色を落としても区別がつく。
+ *      neutral = 空欄  pending = 付箋  settled = 実線  stopped = 二重線
+ *
+ * 4. 型の規則 — 機械が生んだ値（ID・日時・金額）は等幅、人が書いた文
+ *    （氏名・件名）は可変幅、見出しは明朝。書体だけで出所が分かる。
+ *
+ * 色は状態のためだけに使う。枠まわり（リンク・見出し・既定のボタン）は
+ * すべて墨一色で、状態を変える操作だけが、その状態の色をまとう。
+ */
+
+:root {
+  /* 紙。帳簿の淡緑。クリームでも白でもない。 */
+  --washi: #e8ebe3;
+  --sheet: #f9faf6;
+  --sheet-alt: #eef1e7; /* 縞 */
+  --sunken: #e2e6db;
+
+  /* 墨。純黒を避け、わずかに緑を含ませて紙になじませる。 */
+  --sumi: #1e241d;
+  --sumi-muted: #58614f;
+  /* 単位や注記に使う。薄いが、紙地・縞の上でも 4.5:1 は割らない濃さ。 */
+  --sumi-faint: #616b5a;
+
+  /* 罫線。 */
+  --keisen: #ccd2c3;
+  --keisen-strong: #a3ac98;
+
+  /* 状態色。ひとつの色はひとつの意味にしか使わない。 */
+  --ai: #1c4f6e; /* 確定・有効・承認 */
+  --yamabuki: #b07f13; /* 進行中・要対応（付箋） */
+  --yamabuki-ink: #7a5806; /* 同上、文字に使う濃さ */
+  --shu: #a5372a; /* 停止・却下・破壊的操作 */
+
+  --ai-wash: #e6edf1;
+  --yamabuki-wash: #f6efdd;
+  --shu-wash: #f4e5e2;
+
+  /* 見出しは明朝。業務書類の見出しはいまも明朝で組まれている。 */
+  --font-display: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Noto Serif JP", serif;
+  /* 本文は UD ゴシック優先。長文ではなく短い語を大量に読む画面のため。 */
+  --font-ui: "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic UI", "Yu Gothic", "Noto Sans JP",
+    system-ui, sans-serif;
+  --font-data: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", monospace;
+
+  /* 4 の倍数。行の詰まりを保つため刻みは細かめ。 */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+
+  /* 綴じ代の寸法。印の位置・幅・縦罫の位置・本文の始まり。
+     帳票なので角は落とさない。丸いのは印（アバター）だけ。 */
+  --mark-x: 10px;
+  --mark-w: 4px;
+  --rule-x: 22px;
+  --margin-pad: 34px;
+
+  --topbar-h: 52px;
+
+  --shadow-menu: 0 8px 24px rgb(30 36 29 / 16%);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--washi);
+  color: var(--sumi);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 書体の役割 ───────────────────────────────────── */
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* 見出しは明朝。件名も氏名もここに入る。 */
+h1 {
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* 節の見出しは帳票の欄名。小さく、字間を開き、行頭に罫を引く。 */
+h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  /* 並びの相手（絞り込みなど）に押し潰されない。 */
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--sumi-muted);
+}
+
+h2::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  background: var(--sumi-muted);
+  flex: 0 0 auto;
+}
+
+p {
+  margin: 0;
+}
+
+/* リンクは墨。色は状態に取ってあるので、下線だけで示す。 */
+a {
+  color: var(--sumi);
+  text-decoration: underline;
+  text-decoration-color: var(--keisen-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* キーボード操作が常に見えること。 */
+:focus-visible {
+  outline: 2px solid var(--ai);
+  outline-offset: 2px;
+}
+
+/* 帳簿は動かない。動きは操作への即応だけに絞る。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 機械が生んだ値。桁を揃えて縦に読めるようにする。 */
+.data {
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--sumi-muted);
+}
+
+.data--strong {
+  color: var(--sumi);
+  font-size: 13px;
+}
+
+/* ── 状態の印（綴じ代に入るもの） ───────────────────────── */
+
+.rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--mark-x);
+  width: var(--mark-w);
+}
+
+/* 空欄。まだ何も起きていないので、細罫を1本引くだけ。 */
+.rail--neutral {
+  background: linear-gradient(
+    90deg,
+    transparent 0 1.5px,
+    var(--keisen-strong) 1.5px 2.5px,
+    transparent 2.5px
+  );
+}
+
+/* 付箋。手元に留まって処理を待っているもの。旗が上に出る。 */
+.rail--pending {
+  background: var(--yamabuki);
+}
+
+.rail--pending::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -3px;
+  right: -3px;
+  height: 10px;
+  background: var(--yamabuki);
+}
+
+/* 実線。記帳が済んで確定したもの。 */
+.rail--settled {
+  background: var(--ai);
+}
+
+/* 二重線。取り消し・却下。帳簿の訂正と同じ引き方。 */
+.rail--stopped {
+  background: linear-gradient(
+    90deg,
+    var(--shu) 0 1px,
+    transparent 1px 3px,
+    var(--shu) 3px 4px
+  );
+}
+
+/* ── 状態の欄（文字で読ませるもの） ───────────────────── */
+
+.status {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--s2);
+  border: 1px solid var(--keisen-strong);
+  border-left-width: 3px;
+  font-size: 12px;
+  line-height: 1.9;
+  white-space: nowrap;
+  color: var(--sumi-muted);
+}
+
+/* 付箋だけが塗られている。溜まっている件が面で分かる。 */
+.status--pending {
+  border-color: var(--yamabuki);
+  background: var(--yamabuki-wash);
+  color: var(--yamabuki-ink);
+}
+
+.status--settled {
+  border-left-color: var(--ai);
+  color: var(--ai);
+}
+
+/* 二重線を敷く。文字には掛けないので読みは落ちない。枠の外に重ねるので、
+   どの状態でも欄の寸法は変わらない。 */
+.status--stopped {
+  border-left-color: var(--shu);
+  color: var(--shu);
+}
+
+.status--stopped::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  bottom: -4px;
+  height: 3px;
+  border-top: 1px solid var(--shu);
+  border-bottom: 1px solid var(--shu);
+}
+
+/* ── 全体の枠 ─────────────────────────────────────── */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: var(--topbar-h);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: 0 var(--s5);
+  background: var(--sheet);
+  border-bottom: 1px solid var(--keisen-strong);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar__home {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--sumi);
+  text-decoration: none;
+}
+
+/* 製品マーク。綴じ代に並ぶ3つの状態を、そのまま印にした。 */
+.mark {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 15px;
+}
+
+.mark span {
+  width: 3px;
+}
+
+.mark span:nth-child(1) {
+  background: var(--ai);
+  height: 100%;
+}
+
+.mark span:nth-child(2) {
+  background: var(--yamabuki);
+  height: 70%;
+}
+
+.mark span:nth-child(3) {
+  background: var(--shu);
+  height: 45%;
+}
+
+.topbar__sep {
+  color: var(--keisen-strong);
+}
+
+.topbar__context {
+  color: var(--sumi-muted);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.topbar__spacer {
+  flex: 1 1 auto;
+}
+
+.page {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: var(--s6) var(--s5) var(--s7);
+}
+
+/* 詳細画面の先頭にある「一覧へ戻る」。見出しと重ならないよう間を取る。 */
+.page > p:first-child {
+  margin-bottom: var(--s4);
+}
+
+.page__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  margin-bottom: var(--s5);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--keisen-strong);
+}
+
+.page__lead {
+  flex-basis: 100%;
+  margin-top: var(--s1);
+  color: var(--sumi-muted);
+}
+
+.section {
+  margin-top: var(--s6);
+}
+
+.section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+}
+
+/* ── ユーザーメニュー ─────────────────────────────────── */
+
+.usermenu {
+  position: relative;
+}
+
+.usermenu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s2);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--sumi);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.usermenu__trigger:hover,
+.usermenu__trigger[aria-expanded="true"] {
+  background: var(--sunken);
+}
+
+.usermenu__trigger[aria-expanded="true"] {
+  border-color: var(--keisen-strong);
+}
+
+/* 丸いのは印だけ、という決めごとのとおり、ここは円。 */
+.avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--ai);
+  color: var(--ai);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.usermenu__name {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usermenu__caret {
+  color: var(--sumi-faint);
+  font-size: 10px;
+}
+
+/* 外側クリックで閉じるための面。document へのリスナより、
+   要素として持つ方がテストで到達できる分岐が素直になる。 */
+.usermenu__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+}
+
+.usermenu__panel {
+  position: absolute;
+  top: calc(100% + var(--s2));
+  right: 0;
+  min-width: 248px;
+  padding: var(--s2) 0;
+  background: var(--sheet);
+  border: 1px solid var(--keisen-strong);
+  box-shadow: var(--shadow-menu);
+  z-index: 20;
+}
+
+.usermenu__identity {
+  padding: var(--s2) var(--s4) var(--s3);
+  margin-bottom: var(--s2);
+  border-bottom: 1px solid var(--keisen);
+}
+
+.usermenu__identity strong {
+  display: block;
+  font-weight: 600;
+}
+
+.usermenu__item {
+  display: block;
+  width: 100%;
+  padding: var(--s2) var(--s4);
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--sumi);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.usermenu__item:hover {
+  background: var(--sunken);
+}
+
+.usermenu__item--danger {
+  color: var(--shu);
+}
+
+/* ── アプリの一覧 ─────────────────────────────────── */
+
+.launcher {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s4);
+}
+
+/* カードは1件しかないので綴じ代は引かない。状態の印は背に貼った付箋の
+   形で、左上に短く出る。溜まっているアプリだけが目に留まる。 */
+.applink {
+  position: relative;
+  display: block;
+  padding: var(--s5);
+  background: var(--sheet);
+  border: 1px solid var(--keisen-strong);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+
+.applink:hover {
+  background-color: var(--sheet-alt);
+}
+
+.applink .rail {
+  top: 0;
+  bottom: auto;
+  /* 枠線から離す。ここが詰まると印が二重線に見えてしまう。 */
+  left: 3px;
+  height: 46px;
+}
+
+.applink .rail--pending::before {
+  left: 0;
+  right: -6px;
+  height: 14px;
+}
+
+.applink__name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.applink__desc {
+  margin-top: var(--s2);
+  color: var(--sumi-muted);
+}
+
+.applink__metric {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin-top: var(--s5);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--keisen);
+}
+
+.applink__count {
+  font-family: var(--font-data);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--sumi);
+}
+
+.applink__unit {
+  font-size: 12px;
+  color: var(--sumi-faint);
+}
+
+/* ── 帳面 ─────────────────────────────────────────── */
+
+.panel {
+  padding: 0;
+  background: var(--sheet);
+  border: 1px solid var(--keisen-strong);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* 欄名は帯にして、列の間に縦罫を落とす。ここだけ罫を通す。 */
+.table th {
+  padding: var(--s2) var(--s4);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--sumi-muted);
+  background: var(--sunken);
+  border-bottom: 1px solid var(--keisen-strong);
+}
+
+.table th + th {
+  border-left: 1px solid var(--keisen);
+}
+
+.table td {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--keisen);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 縞。数字の列を横に追うための紙で、装飾ではない。 */
+.table tbody tr:nth-child(even) td {
+  background-color: var(--sheet-alt);
+}
+
+.table tbody tr:hover td {
+  background-color: var(--ai-wash);
+}
+
+/* 綴じ代。先頭のセルだけ左に余白を取り、縦罫を1本落とす。
+   状態の印はこの罫の左、本文は右。 */
+.table th:first-child,
+.table td:first-child {
+  position: relative;
+  padding-left: var(--margin-pad);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0 var(--rule-x),
+    var(--keisen) var(--rule-x),
+    var(--keisen) calc(var(--rule-x) + 1px),
+    transparent calc(var(--rule-x) + 1px)
+  );
+}
+
+/* 行の見出し。全行が同じ下線を持つと綴じ代の縞と喧嘩するので、
+   ふだんは太さと位置だけで示し、指を置いたときに下線を出す。 */
+.table__name {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.table__name:hover,
+.table__name:focus-visible {
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
+/* 金額は右揃え。桁を縦に並べないと大小を見比べられない。
+   金額の欄は data--strong を持つ唯一の列なので、そこから列位置を引く。 */
+.table td.data--strong,
+.table:has(td.data--strong) th:nth-child(3) {
+  text-align: right;
+}
+
+/* ── 経過（綴じ代を引き伸ばしたもの） ─────────────────── */
+
+.trail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.trail__item {
+  position: relative;
+  margin-left: var(--rule-x);
+  padding: 0 0 var(--s4) var(--s4);
+  border-left: 1px solid var(--keisen);
+  /* 見出しと日時の2行を一つの塊として読ませる。 */
+  line-height: 1.5;
+}
+
+.trail__item:last-child {
+  padding-bottom: 0;
+  border-left-color: transparent;
+}
+
+/* 印は表の綴じ代と同じ4つ。ここでは罫をまたぐ形になる。 */
+.trail__item::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 8px;
+  width: 11px;
+  height: 2px;
+  background: var(--sumi-faint);
+}
+
+.trail__item--pending::before {
+  top: 6px;
+  width: 9px;
+  height: 9px;
+  background: var(--yamabuki);
+}
+
+.trail__item--settled::before {
+  top: 5px;
+  left: -6px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ai);
+}
+
+.trail__item--stopped::before {
+  top: 7px;
+  width: 11px;
+  left: -6px;
+  height: 4px;
+  background: linear-gradient(
+    180deg,
+    var(--shu) 0 1px,
+    transparent 1px 3px,
+    var(--shu) 3px 4px
+  );
+}
+
+.trail__label {
+  font-weight: 600;
+}
+
+/* ── 記入欄 ───────────────────────────────────────── */
+
+.form {
+  display: grid;
+  gap: var(--s4);
+}
+
+.form--inline {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.field {
+  position: relative;
+  display: grid;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+/* 横並びのときは、単位を欄名の右肩に寄せる。流し込みに残すと、注記の
+   ある欄だけ背が高くなって入力欄の下端が横に揃わない。 */
+.form--inline .field__hint {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 11px;
+}
+
+.field > label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--sumi-muted);
+}
+
+/* 記入する箇所は下線で示す。枠で囲うと帳面が枠だらけになる。 */
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  background: var(--sheet);
+  border: 1px solid var(--keisen);
+  border-bottom: 2px solid var(--keisen-strong);
+  color: var(--sumi);
+  font: inherit;
+  transition: border-color 120ms ease;
+}
+
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-bottom-color: var(--sumi-faint);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--ai);
+}
+
+.field--data input {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+.field__hint {
+  font-size: 12px;
+  color: var(--sumi-faint);
+}
+
+/* ── ボタン ───────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s4);
+  background: var(--sheet);
+  border: 1px solid var(--keisen-strong);
+  color: var(--sumi);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--sunken);
+}
+
+.btn:disabled {
+  color: var(--sumi-faint);
+  border-color: var(--keisen);
+  cursor: not-allowed;
+}
+
+/* 既定の操作は墨。状態を変えるわけではないので色を持たない。 */
+.btn--primary {
+  background: var(--sumi);
+  border-color: var(--sumi);
+  color: var(--sheet);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: #0f130e;
+}
+
+.btn--primary:disabled {
+  background: var(--sumi-faint);
+  border-color: var(--sumi-faint);
+  color: var(--sheet);
+}
+
+/* 承認は「確定」を作る操作なので、確定の色をまとう。 */
+.btn--approve {
+  background: var(--ai);
+  border-color: var(--ai);
+  color: var(--sheet);
+}
+
+.btn--approve:hover:not(:disabled) {
+  background: #143c55;
+}
+
+/* 却下・停止・削除は「取り消し」を作る操作。塗らずに縁だけ朱に。 */
+.btn--danger {
+  border-color: var(--shu);
+  color: var(--shu);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--shu-wash);
+}
+
+.btn-row {
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+/* 絞り込みは「どれか一つを選ぶ」列。並びを繋いで、実行するボタンと
+   見た目から区別する。押されている欄が塗り潰される。 */
+.btn-row:has(.btn[aria-pressed]) {
+  gap: 0;
+}
+
+.btn-row:has(.btn[aria-pressed]) .btn + .btn {
+  border-left-width: 0;
+}
+
+.btn[aria-pressed="true"] {
+  background: var(--sumi);
+  border-color: var(--sumi);
+  color: var(--sheet);
+}
+
+/* ── 通知・空欄 ───────────────────────────────────── */
+
+.alert {
+  margin-bottom: var(--s4);
+  padding: var(--s3) var(--s4);
+  background: var(--shu-wash);
+  border: 1px solid var(--shu);
+  border-left-width: 3px;
+  color: #7f2a20;
+}
+
+.empty,
+.loading {
+  padding: var(--s6) var(--s4);
+  text-align: center;
+  color: var(--sumi-muted);
+}
+
+.loading {
+  color: var(--sumi-faint);
+}
+
+/* ── 明細 ─────────────────────────────────────────── */
+
+/* 帳票の記入済み欄。行ごとに罫を引いて、項目名と値の対を固定する。 */
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  margin: 0;
+  border-top: 1px solid var(--keisen);
+}
+
+.facts dt,
+.facts dd {
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--keisen);
+}
+
+.facts dt {
+  padding-right: var(--s5);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--sumi-muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+/* ── 頁送り ───────────────────────────────────────── */
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s4);
+}
+
+.pager__note {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--sumi-faint);
+}
+
+/* ── ログイン ─────────────────────────────────────── */
+
+.signin {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--s5);
+}
+
+.signin__card {
+  width: 100%;
+  max-width: 390px;
+  padding: var(--s6);
+  background: var(--sheet);
+  border: 1px solid var(--keisen-strong);
+  /* 表紙にだけ、綴じ側を厚く取る。 */
+  border-left: 3px solid var(--sumi);
+}
+
+.signin__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding-bottom: var(--s4);
+  margin-bottom: var(--s5);
+  border-bottom: 1px solid var(--keisen);
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+}
+
+.signin__title {
+  font-size: 19px;
+}
+
+.signin__lead {
+  margin-top: var(--s1);
+  margin-bottom: var(--s5);
+  color: var(--sumi-muted);
+}
+
+/* ── 狭い画面 ─────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .page {
+    padding: var(--s5) var(--s4) var(--s6);
+  }
+
+  .topbar {
+    padding: 0 var(--s4);
+  }
+
+  .usermenu__name,
+  .topbar__context,
+  .topbar__sep {
+    display: none;
+  }
+
+  .facts {
+    grid-template-columns: 1fr;
+  }
+
+  .facts dt {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  /* 見出しと絞り込みは上下に分ける。横に並べると見出しが潰れる。 */
+  .section__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* 折り返す幅では欄を繋がない。繋いだまま折り返すと、2行目の先頭だけ
+     左の枠線を失って壊れて見える。 */
+  .btn-row:has(.btn[aria-pressed]) {
+    gap: var(--s1);
+  }
+
+  .btn-row:has(.btn[aria-pressed]) .btn + .btn {
+    border-left-width: 1px;
+  }
+
+  /* 2列目（メール・申請者）と最終列（日時）を畳み、件名・金額・状態を
+     読める幅で残す。綴じ代は畳まない。 */
+  .table th:nth-child(2),
+  .table td:nth-child(2),
+  .table th:last-child,
+  .table td:last-child {
+    display: none;
+  }
+
+  .table th,
+  .table td {
+    padding-left: var(--s3);
+    padding-right: var(--s3);
+  }
+
+  .table th:first-child,
+  .table td:first-child {
+    padding-left: var(--margin-pad);
+  }
+}

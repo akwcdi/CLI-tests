@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { ValidationError } from '@test/core';
 
 import {
+  readAmount,
   readCursor,
+  readDecision,
+  readRequestStatus,
   readJsonObject,
   readLimit,
   readOptionalString,
@@ -112,5 +115,54 @@ describe('readCursor', () => {
 
   it('指定があればそのまま返す', () => {
     expect(readCursor('abc')).toBe('abc');
+  });
+});
+
+describe('readDecision', () => {
+  it.each([['approved'], ['rejected']])('%s は通る', (decision) => {
+    expect(readDecision({ decision }, 'decision')).toBe(decision);
+  });
+
+  it.each([
+    ['未指定', {}],
+    ['許可外の値', { decision: 'pending' }],
+    ['文字列でない', { decision: 1 }],
+  ])('%s なら ValidationError', (_label, body) => {
+    expect(() => readDecision(body, 'decision')).toThrowError(
+      new ValidationError('decision', 'decision must be "approved" or "rejected"'),
+    );
+  });
+});
+
+describe('readRequestStatus', () => {
+  it('未指定なら undefined（絞り込まない）', () => {
+    expect(readRequestStatus(undefined)).toBeUndefined();
+  });
+
+  it.each([['draft'], ['pending'], ['approved'], ['rejected']])('%s は通る', (status) => {
+    expect(readRequestStatus(status)).toBe(status);
+  });
+
+  it('許可外の値は ValidationError', () => {
+    expect(() => readRequestStatus('unknown')).toThrowError(
+      new ValidationError('status', 'status の値が不正です'),
+    );
+  });
+});
+
+describe('readAmount', () => {
+  it('数値ならそのまま返す', () => {
+    expect(readAmount({ amount: 12000 }, 'amount')).toBe(12000);
+  });
+
+  it.each([
+    ['未指定', {}],
+    ['文字列', { amount: '12000' }],
+    ['NaN', { amount: Number.NaN }],
+    ['Infinity', { amount: Number.POSITIVE_INFINITY }],
+  ])('数値でなければ ValidationError: %s', (_label, body) => {
+    expect(() => readAmount(body, 'amount')).toThrowError(
+      new ValidationError('amount', 'amount must be a number'),
+    );
   });
 });

@@ -35,3 +35,26 @@ export interface ApiErrorBody {
     field?: string;
   };
 }
+
+export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
+/** 申請。申請者名・決裁者名を含む一覧/詳細用の形。 */
+export interface ApprovalRequest {
+  id: string;
+  title: string;
+  amount: number;
+  status: RequestStatus;
+  /** 申請者。アカウントが削除されると null になる（申請自体は残る）。 */
+  requester_id: string | null;
+  requester_name: string | null;
+  decided_by: string | null;
+  decider_name: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+/** アプリトップに出す指標。 */
+export interface Overview {
+  users: number;
+  pendingRequests: number;
+}

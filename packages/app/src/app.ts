@@ -1,4 +1,10 @@
-import { SESSION_COOKIE, UserNotFoundError, ValidationError, verifyPassword } from '@test/core';
+import {
+  RequestNotFoundError,
+  SESSION_COOKIE,
+  UserNotFoundError,
+  ValidationError,
+  verifyPassword,
+} from '@test/core';
 import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 
@@ -6,10 +12,13 @@ import { requireSession } from './auth.ts';
 import { describeError, UnauthorizedError } from './errors.ts';
 import { EVENT_TYPES, recordEvent } from './events.ts';
 import {
+  readAmount,
   readCursor,
+  readDecision,
   readJsonObject,
   readLimit,
   readOptionalString,
+  readRequestStatus,
   readStatus,
   readString,
 } from './request.ts';
@@ -23,7 +32,7 @@ import type { AppEnv, Deps } from './types.ts';
  */
 export function createApp(deps: Deps): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
-  const { users, auth, events } = deps;
+  const { users, auth, events, requests } = deps;
 
   app.onError((error, c) => {
     const { status, body } = describeError(error);
@@ -73,6 +82,9 @@ export function createApp(deps: Deps): Hono<AppEnv> {
   app.use('/api/me', requireSession(auth));
   app.use('/api/users', requireSession(auth));
   app.use('/api/users/*', requireSession(auth));
+  app.use('/api/requests', requireSession(auth));
+  app.use('/api/requests/*', requireSession(auth));
+  app.use('/api/overview', requireSession(auth));
 
   app.get('/api/me', (c) => c.json({ user: c.get('user') }));
 
@@ -135,6 +147,82 @@ export function createApp(deps: Deps): Hono<AppEnv> {
     await recordEvent(events, id, EVENT_TYPES.deleted);
 
     return c.body(null, 204);
+  });
+
+  // アプリトップの指標。2 アプリぶんを 1 往復で返す。
+  app.get('/api/overview', async (c) => {
+    const [userCount, pending] = await Promise.all([
+      users.countAll(),
+      requests.countByStatus('pending'),
+    ]);
+    return c.json({ users: userCount, pendingRequests: pending });
+  });
+
+  app.get('/api/requests', async (c) => {
+    const page = await requests.list({
+      limit: readLimit(c.req.query('limit')),
+      cursor: readCursor(c.req.query('cursor')),
+      status: readRequestStatus(c.req.query('status')),
+    });
+    return c.json(page);
+  });
+
+  app.post('/api/requests', async (c) => {
+    const body = await readJsonObject(c.req);
+    const created = await requests.create({
+      title: readString(body, 'title'),
+      amount: readAmount(body, 'amount'),
+      // 申請者は常にサインイン中の本人。クライアントの指定は受け付けない。
+      requesterId: c.get('user').id,
+    });
+
+    await recordEvent(events, created.id, EVENT_TYPES.requestCreated, {
+      title: created.title,
+      amount: created.amount,
+    });
+
+    return c.json({ request: created }, 201);
+  });
+
+  app.get('/api/requests/:id', async (c) => {
+    const id = c.req.param('id');
+    const found = await requests.findById(id);
+    if (found === null) {
+      throw new RequestNotFoundError(id);
+    }
+    return c.json({ request: found });
+  });
+
+  app.post('/api/requests/:id/submit', async (c) => {
+    const id = c.req.param('id');
+    // 提出できるのは申請者本人だけ。クライアントの指定は受け付けない。
+    const updated = await requests.submit(id, c.get('user').id);
+    await recordEvent(events, id, EVENT_TYPES.requestSubmitted);
+    return c.json({ request: updated });
+  });
+
+  app.post('/api/requests/:id/decision', async (c) => {
+    const id = c.req.param('id');
+    const body = await readJsonObject(c.req);
+    const decision = readDecision(body, 'decision');
+
+    const updated = await requests.decide(id, decision, c.get('user').id);
+    await recordEvent(
+      events,
+      id,
+      decision === 'approved' ? EVENT_TYPES.requestApproved : EVENT_TYPES.requestRejected,
+      { decidedBy: c.get('user').id },
+    );
+
+    return c.json({ request: updated });
+  });
+
+  app.get('/api/requests/:id/events', async (c) => {
+    const page = await events.listByUser(c.req.param('id'), {
+      limit: readLimit(c.req.query('limit')),
+      cursor: readCursor(c.req.query('cursor')),
+    });
+    return c.json(page);
   });
 
   app.get('/api/users/:id/events', async (c) => {

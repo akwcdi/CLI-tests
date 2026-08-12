@@ -157,6 +157,12 @@ export class UserRepository {
     return row;
   }
 
+  /** 総件数。アプリトップの指標に使う。 */
+  async countAll(): Promise<number> {
+    const result = await this.#db.query<{ n: number }>(`SELECT count(*)::int AS n FROM users`);
+    return result.rows[0]?.n ?? 0;
+  }
+
   /** 削除できたら true、対象が無ければ false。 */
   async deleteById(id: string): Promise<boolean> {
     const result = await this.#db.query(`DELETE FROM users WHERE id = $1`, [id]);

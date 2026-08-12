@@ -19,8 +19,9 @@ test.describe('ログイン', () => {
     await page.getByLabel('パスワード').fill(E2E_USER.password);
     await page.getByRole('button', { name: 'ログイン' }).click();
 
-    await expect(page).toHaveURL(/\/users/);
-    await expect(page.getByRole('heading', { name: 'ユーザー一覧' })).toBeVisible();
+    // ログイン後の着地点はアプリトップ。
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole('heading', { name: /さん/ })).toBeVisible();
   });
 
   test('パスワードが違うとエラーが出て、画面に留まる', async ({ page }) => {
@@ -38,9 +39,11 @@ test.describe('ログイン', () => {
     await page.getByLabel('メールアドレス').fill(E2E_USER.email);
     await page.getByLabel('パスワード').fill(E2E_USER.password);
     await page.getByRole('button', { name: 'ログイン' }).click();
-    await expect(page.getByRole('heading', { name: 'ユーザー一覧' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /さん/ })).toBeVisible();
 
-    await page.getByRole('button', { name: 'ログアウト' }).click();
+    // サインアウトは右上のユーザーメニューから。
+    await page.getByRole('button', { name: /E2E Admin/ }).click();
+    await page.getByRole('menuitem', { name: 'サインアウト' }).click();
     await expect(page).toHaveURL(/\/login/);
 
     await page.goto('/users');

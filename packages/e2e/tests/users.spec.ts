@@ -22,6 +22,21 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'ユーザー一覧' })).toBeVisible();
 });
 
+test('右上のメニューにサインイン中のユーザーが出る', async ({ page }) => {
+  const trigger = page.getByRole('button', { name: /E2E Admin/ });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+  await trigger.click();
+
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('e2e@example.com');
+
+  // Escape で閉じる。
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+});
+
 test('一覧にシード済みのユーザーが並ぶ', async ({ page }) => {
   const rows = page.locator('tbody tr');
 
@@ -43,7 +58,7 @@ test('作成したユーザーが一覧に現れ、詳細に作成イベント�
   // この 1 本だけが 2 ストアの整合を見ている。
   await row.getByRole('link', { name: 'Created User' }).click();
   await expect(page.getByRole('heading', { name: 'Created User' })).toBeVisible();
-  await expect(page.getByRole('listitem').filter({ hasText: 'user.created' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'ユーザーを作成' })).toBeVisible();
 });
 
 test('重複したメールはエラーになり、行は増えない', async ({ page }) => {
@@ -68,7 +83,7 @@ test('停止すると詳細と一覧の両方に反映され、履歴にも残�
 
   await expect(page.getByTestId('status')).toHaveText('停止中');
   await expect(
-    page.getByRole('listitem').filter({ hasText: 'user.status_changed' }),
+    page.getByRole('listitem').filter({ hasText: '状態を変更' }),
   ).toBeVisible();
 
   await page.getByRole('link', { name: '一覧へ戻る' }).click();

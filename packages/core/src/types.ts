@@ -51,3 +51,32 @@ export interface Page<T> {
   items: T[];
   nextCursor: string | null;
 }
+
+/** 申請の状態。approved / rejected は終端。 */
+export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+
+/** requests テーブルの1行。 */
+export interface RequestRow {
+  id: string;
+  title: string;
+  amount: number;
+  status: RequestStatus;
+  /** 申請者。アカウントが削除されると null になる（申請自体は残る）。 */
+  requester_id: string | null;
+  decided_by: string | null;
+  created_at: Date;
+  decided_at: Date | null;
+}
+
+/** 一覧表示用に申請者名を添えた行。名前はアカウント削除で失われる。 */
+export interface RequestWithNames extends RequestRow {
+  requester_name: string | null;
+  decider_name: string | null;
+}
+
+/** 申請の新規作成入力。 */
+export interface NewRequest {
+  title: string;
+  amount: number;
+  requesterId: string;
+}
