@@ -76,6 +76,49 @@ describe('UsersPage ページング', () => {
     expect(screen.getByRole('button', { name: '先頭へ' })).toBeDisabled();
   });
 
+  it('先頭ページでは「前へ」は押せない', async () => {
+    await renderInShell(<UsersPage />);
+    await settled();
+
+    expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled();
+    expect(screen.getByText('1 ページ目')).toBeInTheDocument();
+  });
+
+  it('「前へ」で1ページずつ辿ってきたカーソルに戻る', async () => {
+    apiMock.listUsers
+      .mockResolvedValueOnce({ items: [makeUser({ id: 'u1' })], nextCursor: 'c1' })
+      .mockResolvedValueOnce({ items: [makeUser({ id: 'u2' })], nextCursor: 'c2' })
+      .mockResolvedValueOnce({ items: [makeUser({ id: 'u3' })], nextCursor: null })
+      .mockResolvedValueOnce({ items: [makeUser({ id: 'u2' })], nextCursor: 'c2' })
+      .mockResolvedValueOnce({ items: [makeUser({ id: 'u1' })], nextCursor: 'c1' });
+    const user = userEvent.setup();
+
+    await renderInShell(<UsersPage />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    await waitFor(() => {
+      expect(apiMock.listUsers).toHaveBeenLastCalledWith({ limit: 5, cursor: 'c1' });
+    });
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    await waitFor(() => {
+      expect(apiMock.listUsers).toHaveBeenLastCalledWith({ limit: 5, cursor: 'c2' });
+    });
+    expect(screen.getByText('3 ページ目')).toBeInTheDocument();
+
+    // 2ページ目のカーソルは c1。3ページ目からは1つ手前に戻る。
+    await user.click(screen.getByRole('button', { name: '前へ' }));
+    await waitFor(() => {
+      expect(apiMock.listUsers).toHaveBeenLastCalledWith({ limit: 5, cursor: 'c1' });
+    });
+
+    await user.click(screen.getByRole('button', { name: '前へ' }));
+    await waitFor(() => {
+      expect(apiMock.listUsers).toHaveBeenLastCalledWith({ limit: 5, cursor: null });
+    });
+    expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled();
+  });
+
   it('「次へ」でカーソルを渡して再取得し、「先頭へ」で戻る', async () => {
     apiMock.listUsers
       .mockResolvedValueOnce({ items: [makeUser({ id: 'u1' })], nextCursor: 'c1' })

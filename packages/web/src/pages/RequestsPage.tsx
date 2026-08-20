@@ -19,7 +19,9 @@ const FILTERS: { value: RequestStatus | 'all'; label: string }[] = [
 
 export function RequestsPage() {
   const [items, setItems] = useState<ApprovalRequest[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  // キーセット・ページングは前に戻るカーソルを返さないので、辿ってきた
+  // ページのカーソルを控えておく。末尾が表示中のページ、先頭は常に null。
+  const [trail, setTrail] = useState<(string | null)[]>([null]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,9 @@ export function RequestsPage() {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const cursor = trail[trail.length - 1] ?? null;
+  const atFirstPage = trail.length === 1;
 
   const load = useCallback(
     async (from: string | null, status: RequestStatus | 'all'): Promise<void> => {
@@ -62,10 +67,10 @@ export function RequestsPage() {
       await api.createRequest({ title, amount: Number(amount) });
       setTitle('');
       setAmount('');
-      if (cursor === null) {
+      if (atFirstPage) {
         await load(null, filter);
       } else {
-        setCursor(null);
+        setTrail([null]);
       }
     } catch (caught) {
       setError(toMessage(caught));
@@ -75,7 +80,8 @@ export function RequestsPage() {
   }
 
   function changeFilter(next: RequestStatus | 'all'): void {
-    setCursor(null);
+    // カーソルは絞り込みごとに意味が変わるので、履歴ごと捨てる。
+    setTrail([null]);
     setFilter(next);
   }
 
@@ -181,19 +187,28 @@ export function RequestsPage() {
           <button
             type="button"
             className="btn"
-            onClick={() => setCursor(null)}
-            disabled={cursor === null}
+            onClick={() => setTrail([null])}
+            disabled={atFirstPage}
           >
             先頭へ
           </button>
           <button
             type="button"
             className="btn"
-            onClick={() => setCursor(nextCursor)}
+            onClick={() => setTrail((current) => current.slice(0, -1))}
+            disabled={atFirstPage}
+          >
+            前へ
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setTrail((current) => [...current, nextCursor])}
             disabled={nextCursor === null}
           >
             次へ
           </button>
+          <span className="pager__note">{trail.length} ページ目</span>
         </div>
       </div>
     </AppShell>

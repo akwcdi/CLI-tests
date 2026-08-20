@@ -138,6 +138,84 @@ describe('RequestsPage ページング', () => {
       );
     });
   });
+
+  it('先頭ページでは「前へ」は押せない', async () => {
+    await render();
+    await screen.findByText('該当する申請はありません。');
+
+    expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled();
+    expect(screen.getByText('1 ページ目')).toBeInTheDocument();
+  });
+
+  it('「前へ」で1ページずつ辿ってきたカーソルに戻る', async () => {
+    apiMock.listRequests
+      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r1' })], nextCursor: 'c1' })
+      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r2' })], nextCursor: 'c2' })
+      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r3' })], nextCursor: null })
+      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r2' })], nextCursor: 'c2' })
+      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r1' })], nextCursor: 'c1' });
+    await render();
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    await waitFor(() => {
+      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: 'c1' }),
+      );
+    });
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    await waitFor(() => {
+      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: 'c2' }),
+      );
+    });
+    expect(screen.getByText('3 ページ目')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '前へ' }));
+    await waitFor(() => {
+      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: 'c1' }),
+      );
+    });
+
+    await user.click(screen.getByRole('button', { name: '前へ' }));
+    await waitFor(() => {
+      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: null }),
+      );
+    });
+    expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled();
+  });
+
+  it('絞り込みを変えるとページ履歴を捨てる', async () => {
+    apiMock.listRequests
+      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r1' })], nextCursor: 'c1' })
+      .mockResolvedValue({ items: [makeRequest({ id: 'r2' })], nextCursor: null });
+    await render();
+    await screen.findByRole('table');
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: '次へ' }));
+    await waitFor(() => {
+      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
+        expect.objectContaining({ cursor: 'c1' }),
+      );
+    });
+
+    // カーソルは絞り込みごとに意味が変わるので、前の絞り込みの履歴は残さない。
+    await user.click(screen.getByRole('button', { name: '承認待ち' }));
+
+    await waitFor(() => {
+      expect(apiMock.listRequests).toHaveBeenLastCalledWith({
+        limit: 5,
+        cursor: null,
+        status: 'pending',
+      });
+    });
+    expect(screen.getByText('1 ページ目')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled();
+  });
 });
 
 describe('RequestsPage 下書き作成', () => {
