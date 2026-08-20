@@ -11,7 +11,9 @@ const PAGE_SIZE = 5;
 
 export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  // キーセット・ページングは前に戻るカーソルを返さないので、辿ってきた
+  // ページのカーソルを控えておく。末尾が表示中のページ、先頭は常に null。
+  const [trail, setTrail] = useState<(string | null)[]>([null]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +22,9 @@ export function UsersPage() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const cursor = trail[trail.length - 1] ?? null;
+  const atFirstPage = trail.length === 1;
 
   const load = useCallback(async (from: string | null): Promise<void> => {
     setLoading(true);
@@ -49,10 +54,10 @@ export function UsersPage() {
       setName('');
       setPassword('');
       // 追加した行が見えるよう先頭ページに戻す。
-      if (cursor === null) {
+      if (atFirstPage) {
         await load(null);
       } else {
-        setCursor(null);
+        setTrail([null]);
       }
     } catch (caught) {
       setError(toMessage(caught));
@@ -142,19 +147,28 @@ export function UsersPage() {
           <button
             type="button"
             className="btn"
-            onClick={() => setCursor(null)}
-            disabled={cursor === null}
+            onClick={() => setTrail([null])}
+            disabled={atFirstPage}
           >
             先頭へ
           </button>
           <button
             type="button"
             className="btn"
-            onClick={() => setCursor(nextCursor)}
+            onClick={() => setTrail((current) => current.slice(0, -1))}
+            disabled={atFirstPage}
+          >
+            前へ
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setTrail((current) => [...current, nextCursor])}
             disabled={nextCursor === null}
           >
             次へ
           </button>
+          <span className="pager__note">{trail.length} ページ目</span>
         </div>
       </div>
     </AppShell>
