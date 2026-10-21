@@ -78,6 +78,13 @@ describe('App のルーティング', () => {
     expect(await screen.findByRole('heading', { name: '申請' })).toBeInTheDocument();
   });
 
+  it('/requests/new は作成画面で、:id には吸われない', async () => {
+    renderApp('/requests/new');
+
+    expect(await screen.findByRole('heading', { name: '申請の下書き' })).toBeInTheDocument();
+    expect(apiMock.getRequest).not.toHaveBeenCalled();
+  });
+
   it('/requests/:id は申請詳細', async () => {
     apiMock.getRequest.mockResolvedValue(makeRequest({ title: '備品購入' }));
     apiMock.listRequestEvents.mockResolvedValue({ items: [], nextCursor: null });

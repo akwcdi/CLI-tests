@@ -21,14 +21,16 @@ beforeEach(() => {
 
 const render = () => renderInShell(<RequestsPage />, '/requests', '/requests');
 
-async function fillForm() {
-  const user = userEvent.setup();
-  await user.type(screen.getByLabelText('件名'), '備品購入');
-  await user.type(screen.getByLabelText('金額'), '12000');
-  return user;
-}
-
 describe('RequestsPage 一覧', () => {
+  it('作成画面への入口を見出しに置く', async () => {
+    await render();
+
+    expect(screen.getByRole('link', { name: '下書きを作る' })).toHaveAttribute(
+      'href',
+      '/requests/new',
+    );
+  });
+
   it('取得した申請を、状態と金額つきで表示する', async () => {
     apiMock.listRequests.mockResolvedValue({
       items: [makeRequest({ title: '備品購入', amount: 12000, status: 'pending' })],
@@ -215,79 +217,5 @@ describe('RequestsPage ページング', () => {
     });
     expect(screen.getByText('1 ページ目')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '前へ' })).toBeDisabled();
-  });
-});
-
-describe('RequestsPage 下書き作成', () => {
-  it('作成後にフォームを空にして一覧を取り直す', async () => {
-    apiMock.createRequest.mockResolvedValue(makeRequest());
-    await render();
-    const user = await fillForm();
-
-    await user.click(screen.getByRole('button', { name: '下書きを作る' }));
-
-    await waitFor(() => {
-      expect(apiMock.createRequest).toHaveBeenCalledWith({ title: '備品購入', amount: 12000 });
-    });
-    expect(screen.getByLabelText('件名')).toHaveValue('');
-    expect(apiMock.listRequests).toHaveBeenCalledTimes(2);
-  });
-
-  it('2ページ目で作成したら先頭ページに戻る', async () => {
-    apiMock.listRequests
-      .mockResolvedValueOnce({ items: [makeRequest({ id: 'r1' })], nextCursor: 'c1' })
-      .mockResolvedValue({ items: [makeRequest({ id: 'r2' })], nextCursor: null });
-    apiMock.createRequest.mockResolvedValue(makeRequest());
-    await render();
-    await screen.findByRole('table');
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole('button', { name: '次へ' }));
-    await waitFor(() => {
-      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
-        expect.objectContaining({ cursor: 'c1' }),
-      );
-    });
-
-    await fillForm();
-    await user.click(screen.getByRole('button', { name: '下書きを作る' }));
-
-    await waitFor(() => {
-      expect(apiMock.listRequests).toHaveBeenLastCalledWith(
-        expect.objectContaining({ cursor: null }),
-      );
-    });
-  });
-
-  it('作成に失敗するとエラーを出し、一覧は取り直さない', async () => {
-    apiMock.createRequest.mockRejectedValue(
-      new ApiError(400, { code: 'validation_error', message: '金額は1以上で入力してください' }),
-    );
-    await render();
-    const user = await fillForm();
-
-    await user.click(screen.getByRole('button', { name: '下書きを作る' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('金額は1以上');
-    expect(apiMock.listRequests).toHaveBeenCalledTimes(1);
-  });
-
-  it('送信中はボタンを無効にする', async () => {
-    let resolve: (value: unknown) => void = () => {};
-    apiMock.createRequest.mockReturnValue(
-      new Promise((r) => {
-        resolve = r;
-      }),
-    );
-    await render();
-    const user = await fillForm();
-
-    await user.click(screen.getByRole('button', { name: '下書きを作る' }));
-    expect(screen.getByRole('button', { name: '下書きを作る' })).toBeDisabled();
-
-    resolve(makeRequest());
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '下書きを作る' })).toBeEnabled();
-    });
   });
 });
