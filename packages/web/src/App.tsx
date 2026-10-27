@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { LoginPage } from './pages/LoginPage.tsx';
 import { AppTopPage } from './pages/AppTopPage.tsx';
+import { NewRequestPage } from './pages/NewRequestPage.tsx';
 import { RequestDetailPage } from './pages/RequestDetailPage.tsx';
 import { RequestsPage } from './pages/RequestsPage.tsx';
 import { UserDetailPage } from './pages/UserDetailPage.tsx';
@@ -21,6 +22,8 @@ export function App() {
       <Route path="/users" element={guarded(<UsersPage />)} />
       <Route path="/users/:id" element={guarded(<UserDetailPage />)} />
       <Route path="/requests" element={guarded(<RequestsPage />)} />
+      {/* 固定の "new" は :id より先に当たる（並び順ではなく静的優先）。 */}
+      <Route path="/requests/new" element={guarded(<NewRequestPage />)} />
       <Route path="/requests/:id" element={guarded(<RequestDetailPage />)} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

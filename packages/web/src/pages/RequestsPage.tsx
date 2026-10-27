@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api } from '../api.ts';
@@ -26,10 +26,6 @@ export function RequestsPage() {
   const [filter, setFilter] = useState<RequestStatus | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [creating, setCreating] = useState(false);
 
   const cursor = trail[trail.length - 1] ?? null;
   const atFirstPage = trail.length === 1;
@@ -59,26 +55,6 @@ export function RequestsPage() {
     void load(cursor, filter);
   }, [load, cursor, filter]);
 
-  async function handleCreate(event: FormEvent): Promise<void> {
-    event.preventDefault();
-    setCreating(true);
-    setError(null);
-    try {
-      await api.createRequest({ title, amount: Number(amount) });
-      setTitle('');
-      setAmount('');
-      if (atFirstPage) {
-        await load(null, filter);
-      } else {
-        setTrail([null]);
-      }
-    } catch (caught) {
-      setError(toMessage(caught));
-    } finally {
-      setCreating(false);
-    }
-  }
-
   function changeFilter(next: RequestStatus | 'all'): void {
     // カーソルは絞り込みごとに意味が変わるので、履歴ごと捨てる。
     setTrail([null]);
@@ -89,32 +65,13 @@ export function RequestsPage() {
     <AppShell title="申請管理">
       <div className="page__head">
         <h1>申請</h1>
+        <Link className="btn btn--primary" to="/requests/new">
+          下書きを作る
+        </Link>
         <p className="page__lead">
           下書きを作って承認へ回します。自分が出した申請は自分で決裁できません。
         </p>
       </div>
-
-      <form className="form form--inline panel" style={{ padding: 'var(--s4)' }} onSubmit={handleCreate}>
-        <div className="field">
-          <label htmlFor="req-title">件名</label>
-          <input id="req-title" value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
-        <div className="field field--data">
-          <label htmlFor="req-amount">金額</label>
-          <input
-            id="req-amount"
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <span className="field__hint">円・整数</span>
-        </div>
-        <div>
-          <button type="submit" className="btn btn--primary" disabled={creating}>
-            下書きを作る
-          </button>
-        </div>
-      </form>
 
       {error !== null && (
         <p className="alert" role="alert">

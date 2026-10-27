@@ -380,6 +380,12 @@ a:hover {
   border-bottom: 1px solid var(--keisen-strong);
 }
 
+/* 見出し行に操作を置くときは右端へ寄せる。見出しの隣に並ぶ状態札とは
+   役割が違うので、間を詰めずに行の反対側へ送る。 */
+.page__head .btn {
+  margin-left: auto;
+}
+
 .page__lead {
   flex-basis: 100%;
   margin-top: var(--s1);
@@ -733,6 +739,17 @@ a:hover {
   gap: var(--s4);
 }
 
+/* 書き込むためだけの画面に置く記入欄。表と違って横いっぱいに伸ばすと
+   記入の列が追えなくなるので、紙の記入欄くらいの幅で止める。 */
+.form--page {
+  max-width: 560px;
+}
+
+/* 金額は桁数が決まっている。欄の幅でそれを示す。 */
+.form--page .field--data {
+  max-width: 220px;
+}
+
 .form--inline {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   align-items: end;
@@ -825,6 +842,12 @@ a:hover {
   color: var(--sumi-faint);
   border-color: var(--keisen);
   cursor: not-allowed;
+}
+
+/* 別画面への入口をボタンとして出す場合。本文のリンクと違い、
+   枠が触れる範囲を示しているので下線は要らない。 */
+a.btn {
+  text-decoration: none;
 }
 
 /* 既定の操作は墨。状態を変えるわけではないので色を持たない。 */

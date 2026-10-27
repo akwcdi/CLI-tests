@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen, type RenderResult } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { afterEach, vi } from 'vitest';
 
 import { RequireSession } from '../src/session.tsx';
@@ -57,16 +57,25 @@ export function makeRequest(overrides: Partial<ApprovalRequest> = {}): ApprovalR
 }
 
 /**
- * 遷移先を検証できる形で描画する。
- * `/login` `/users` `/requests` にはマーカーだけの画面を置いてある。
+ * 遷移先の確認用に置くマーカー画面。
+ * `/login` `/users` `/requests` `/requests/:id` `/` に置いてある。
  */
-/** 遷移先の確認用に置くマーカー画面。 */
 const MARKERS: [string, string][] = [
   ['/login', 'ログイン画面'],
   ['/users', '一覧画面'],
   ['/requests', '申請一覧画面'],
+  ['/requests/:id', '申請詳細画面'],
   ['/', 'アプリトップ'],
 ];
+
+/**
+ * マーカー画面の中身。`:id` を持つ経路では着いた id も出すので、
+ * 画面の種類だけでなく「どの行の詳細に着いたか」まで確かめられる。
+ */
+function Marker({ label }: { label: string }) {
+  const { id } = useParams<{ id: string }>();
+  return <p>{id === undefined ? label : `${label} ${id}`}</p>;
+}
 
 /**
  * 遷移先を検証できる形で描画する。
@@ -78,7 +87,7 @@ export function renderAt(ui: ReactElement, path = '/', routePath = '/'): RenderR
       <Routes>
         <Route path={routePath} element={ui} />
         {MARKERS.filter(([markerPath]) => markerPath !== routePath).map(([markerPath, label]) => (
-          <Route key={markerPath} path={markerPath} element={<p>{label}</p>} />
+          <Route key={markerPath} path={markerPath} element={<Marker label={label} />} />
         ))}
       </Routes>
     </MemoryRouter>,
