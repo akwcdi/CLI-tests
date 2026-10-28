@@ -4,6 +4,8 @@ coverage/
 .test-result/
 *.tsbuildinfo
 
+.claude/output
+
 # Playwright
 playwright-report/
 test-results/
