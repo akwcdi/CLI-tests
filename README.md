@@ -152,16 +152,84 @@ pnpm test:e2e
 **IT とは別の DB / テーブルを使う**（`db_e2e` / `events_e2e`）。
 共有すると片方の後始末がもう片方を壊すため。
 
-Chromium のみ。CI では `retries: 1` / `workers: 2`。
-全テストが1つの DB を共有するので `fullyParallel: false`
-（ファイル内は直列、ファイル間は並列）。
+Chromium の PC（`pc`）とモバイル（`mobile`）の2プロジェクトで回す。
+全テストが1つの DB を共有するので直列（`workers: 1`）。CI では `retries: 1`。
 
 外部で起動済みのアプリに向けたい場合は `E2E_BASE_URL` を設定する。
-そのときアプリの起動もシードもこちらでは行わない。
+そのときアプリの起動もシードも片付けもこちらでは行わない。
 
 ```bash
 E2E_BASE_URL=http://localhost:8080 pnpm test:e2e
 ```
+
+### 環境の分離
+
+DB・テーブル・ポートは作業ツリーのパスから決める（`db_e2e_<id>` /
+`events_e2e_<id>` / 3100〜3899）。worktree を並べて同時に回しても衝突せず、
+`pnpm dev` の 3000 にも繋がらない。終わると DB とテーブルを消し、レポートは残す。
+`E2E_KEEP=1` で DB を残せる。コンテナは IT と共用する。
+
+ポートが使用中なら起動時に落ちる。`E2E_PORT` で逃がす。
+
+### 対応表
+
+「どの実装を、どのシナリオで確かめるか」を `packages/e2e/ledger/` に置く。
+
+| ファイル | 中身 | 更新方法 |
+|---|---|---|
+| `inventory.generated.json` | ソースから抜き出した対象（route / api / flow / link / policy / surface / external） | `pnpm --filter @test/e2e ledger --write` |
+| `scenarios.json` | シナリオ。`covers` に対象、`aspects` に観点を書く | 手で書く |
+| `exceptions.json` | 確かめなくてよい観点と、その理由 | 手で書く |
+| `pending-baseline.json` | 導入時に残っている不足。項目単位で持ち、増やせない | 減らすだけ |
+| `surfaces.json` | 画面ごとのハンドラ数 | シナリオを見直してから手で更新 |
+
+テストにはシナリオ ID をタグで付ける（`{ tag: '@USER-004' }`）。
+
+`pnpm check:e2e` が次を照合する。ブラウザも Docker も要らず、CI では PR ごとに走る。
+
+- inventory がソースと一致し、読めない式が無いこと
+- 全ての対象と必須観点が、実装済みシナリオ・理由付きの例外・baseline のどれかにあること
+- シナリオとテストが過不足なく対応し、PC とモバイルの両方を対象にしていること
+- 消えた対象への参照、不要な例外、満たされた baseline が残っていないこと
+- ハンドラ数が確認済みの値と一致すること
+- 画面が呼ぶ書き込み API とサーバーの定義が一致すること
+- `test.skip` / `only` / `fixme` が無いこと
+- baseline が base ブランチより増えていないこと（`--base <ref>`）
+
+必須観点は、種類で決まる。
+
+| 対象 | 必須観点 |
+|---|---|
+| route / link | `normal` |
+| 書き込みをしない flow | `normal` |
+| 書き込みをする flow / api | `normal` `persist` `invalid` |
+| policy | `denied` |
+
+### テストの書き方
+
+操作手順ではなく、仕様上どうなれば正しいかを書く。
+
+- 保存系は、開き直しても値が残っていることまで見る（`persist`）
+- 不正な入力は、エラー表示に加えて保存されていないことも見る（`invalid`）
+- 画面から行う保存を、API の直接呼び出しで確かめたことにしない。API を
+  直接呼ぶのは、権限の確認と、検証したいこと以外の準備だけにする
+- 今の実装の挙動を正解にしない。仕様が実装と食い違っていたら、テストを
+  合わせず `pending` に理由を書いて報告する
+- `test` は `tests/fixtures.ts` から使う。アプリの外への通信を止め、発生したら落とす
+- 計算の端数や入力の組み合わせは UT / IT に任せる。E2E を厚くしても下の層は薄くしない
+
+### 回す範囲
+
+```bash
+pnpm test:e2e:changed          # origin/main との差分に関係するシナリオだけ
+pnpm test:e2e:changed <ref>    # 比較先を指定
+pnpm test:e2e                  # 全シナリオ。大きなリファクタや PR の前に
+pnpm --filter @test/e2e results  # 直前の結果を要約する。PR の検証欄に貼る
+```
+
+画面ファイルの変更はそれを指すシナリオだけを選び、API・core・共通処理の変更は
+全シナリオに倒す。`results` はスキップを成功に数えず、失敗と未実施を分けて出す。
+CI は PR ごとに全シナリオを回す（`results --all`）。
 
 ## CI
 

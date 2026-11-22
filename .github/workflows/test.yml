@@ -90,8 +90,34 @@ jobs:
         if: always()
         run: pnpm docker:down
 
+  # 実装・対応表・テストの突き合わせ。ブラウザも Docker も使わない。
+  e2e-ledger:
+    name: E2E ledger
+    runs-on: ubuntu-latest
+    steps:
+      # baseline の増加を見るので base ブランチの履歴が要る。
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Test the ledger checker
+        run: pnpm --filter @test/e2e test:ledger
+
+      # main への push では比較する相手が無いので --base を付けない。
+      - name: Check the ledger
+        run: pnpm --filter @test/e2e ledger ${{ github.base_ref && format('--base origin/{0}', github.base_ref) || '' }}
+
   # 実アプリ（Hono API + React SPA）に対して動かす。
-  # IT と同じ compose を使うが、DB とテーブルは別（db_e2e / events_e2e）。
+  # IT と同じ compose を使うが、DB とテーブルは別（db_e2e_<id> / events_e2e_<id>）。
   # アプリの起動は playwright.config.ts の webServer が行う。
   e2e:
     name: E2E
@@ -133,6 +159,10 @@ jobs:
       - name: Run E2E
         run: pnpm test:e2e
 
+      # スキップや実行漏れがあっても、Playwright 自体は成功で終わる。
+      - name: Confirm every scenario ran
+        run: pnpm --filter @test/e2e results --all
+
       - name: Dump container logs
         if: failure()
         run: docker compose -f docker/docker-compose.yml logs --no-color --tail=200
@@ -144,6 +174,7 @@ jobs:
           name: e2e-results
           path: |
             .test-result/e2e-junit.xml
+            .test-result/e2e-results.json
             packages/e2e/playwright-report
             packages/e2e/test-results
           if-no-files-found: warn

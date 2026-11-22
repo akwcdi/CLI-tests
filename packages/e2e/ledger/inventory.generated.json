@@ -1,0 +1,428 @@
+{
+  "items": [
+    {
+      "key": "api:DELETE /api/users/:id",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:PATCH /api/users/:id/status",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:POST /api/login",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:POST /api/logout",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:POST /api/requests",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:POST /api/requests/:id/decision",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:POST /api/requests/:id/submit",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "api:POST /api/users",
+      "kind": "api",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "flow:components/UserMenu.tsx#op:handleKeyDown",
+      "kind": "flow",
+      "file": "packages/web/src/components/UserMenu.tsx"
+    },
+    {
+      "key": "flow:components/UserMenu.tsx#op:setOpen",
+      "kind": "flow",
+      "file": "packages/web/src/components/UserMenu.tsx"
+    },
+    {
+      "key": "flow:components/UserMenu.tsx#testid:usermenu-backdrop",
+      "kind": "flow",
+      "file": "packages/web/src/components/UserMenu.tsx"
+    },
+    {
+      "key": "flow:components/UserMenu.tsx#ui:サインアウト",
+      "kind": "flow",
+      "file": "packages/web/src/components/UserMenu.tsx"
+    },
+    {
+      "key": "flow:pages/LoginPage.tsx#op:handleSubmit",
+      "kind": "flow",
+      "file": "packages/web/src/pages/LoginPage.tsx",
+      "writes": [
+        "POST /api/login"
+      ]
+    },
+    {
+      "key": "flow:pages/NewRequestPage.tsx#op:handleSubmit",
+      "kind": "flow",
+      "file": "packages/web/src/pages/NewRequestPage.tsx",
+      "writes": [
+        "POST /api/requests"
+      ]
+    },
+    {
+      "key": "flow:pages/RequestDetailPage.tsx#ui:却下する",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestDetailPage.tsx",
+      "writes": [
+        "POST /api/requests/:p/decision"
+      ]
+    },
+    {
+      "key": "flow:pages/RequestDetailPage.tsx#ui:承認する",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestDetailPage.tsx",
+      "writes": [
+        "POST /api/requests/:p/decision"
+      ]
+    },
+    {
+      "key": "flow:pages/RequestDetailPage.tsx#ui:承認へ回す",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestDetailPage.tsx",
+      "writes": [
+        "POST /api/requests/:p/submit"
+      ]
+    },
+    {
+      "key": "flow:pages/RequestsPage.tsx#op:changeFilter",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestsPage.tsx"
+    },
+    {
+      "key": "flow:pages/RequestsPage.tsx#ui:先頭へ",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestsPage.tsx"
+    },
+    {
+      "key": "flow:pages/RequestsPage.tsx#ui:前へ",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestsPage.tsx"
+    },
+    {
+      "key": "flow:pages/RequestsPage.tsx#ui:次へ",
+      "kind": "flow",
+      "file": "packages/web/src/pages/RequestsPage.tsx"
+    },
+    {
+      "key": "flow:pages/UserDetailPage.tsx#ui:停止する|再開する",
+      "kind": "flow",
+      "file": "packages/web/src/pages/UserDetailPage.tsx",
+      "writes": [
+        "PATCH /api/users/:p/status"
+      ]
+    },
+    {
+      "key": "flow:pages/UserDetailPage.tsx#ui:削除する",
+      "kind": "flow",
+      "file": "packages/web/src/pages/UserDetailPage.tsx",
+      "writes": [
+        "DELETE /api/users/:p"
+      ]
+    },
+    {
+      "key": "flow:pages/UsersPage.tsx#op:handleCreate",
+      "kind": "flow",
+      "file": "packages/web/src/pages/UsersPage.tsx",
+      "writes": [
+        "POST /api/users"
+      ]
+    },
+    {
+      "key": "flow:pages/UsersPage.tsx#ui:先頭へ",
+      "kind": "flow",
+      "file": "packages/web/src/pages/UsersPage.tsx"
+    },
+    {
+      "key": "flow:pages/UsersPage.tsx#ui:前へ",
+      "kind": "flow",
+      "file": "packages/web/src/pages/UsersPage.tsx"
+    },
+    {
+      "key": "flow:pages/UsersPage.tsx#ui:次へ",
+      "kind": "flow",
+      "file": "packages/web/src/pages/UsersPage.tsx"
+    },
+    {
+      "key": "link:App.tsx#/",
+      "kind": "link",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "link:components/AppShell.tsx#/",
+      "kind": "link",
+      "file": "packages/web/src/components/AppShell.tsx"
+    },
+    {
+      "key": "link:components/AppShell.tsx#/login",
+      "kind": "link",
+      "file": "packages/web/src/components/AppShell.tsx"
+    },
+    {
+      "key": "link:components/UserMenu.tsx#/users/:id",
+      "kind": "link",
+      "file": "packages/web/src/components/UserMenu.tsx"
+    },
+    {
+      "key": "link:pages/AppTopPage.tsx#/requests",
+      "kind": "link",
+      "file": "packages/web/src/pages/AppTopPage.tsx"
+    },
+    {
+      "key": "link:pages/AppTopPage.tsx#/users",
+      "kind": "link",
+      "file": "packages/web/src/pages/AppTopPage.tsx"
+    },
+    {
+      "key": "link:pages/LoginPage.tsx#/",
+      "kind": "link",
+      "file": "packages/web/src/pages/LoginPage.tsx"
+    },
+    {
+      "key": "link:pages/NewRequestPage.tsx#/requests",
+      "kind": "link",
+      "file": "packages/web/src/pages/NewRequestPage.tsx"
+    },
+    {
+      "key": "link:pages/NewRequestPage.tsx#/requests/:id",
+      "kind": "link",
+      "file": "packages/web/src/pages/NewRequestPage.tsx"
+    },
+    {
+      "key": "link:pages/RequestDetailPage.tsx#/requests",
+      "kind": "link",
+      "file": "packages/web/src/pages/RequestDetailPage.tsx"
+    },
+    {
+      "key": "link:pages/RequestsPage.tsx#/requests/:id",
+      "kind": "link",
+      "file": "packages/web/src/pages/RequestsPage.tsx"
+    },
+    {
+      "key": "link:pages/RequestsPage.tsx#/requests/new",
+      "kind": "link",
+      "file": "packages/web/src/pages/RequestsPage.tsx"
+    },
+    {
+      "key": "link:pages/UserDetailPage.tsx#/users",
+      "kind": "link",
+      "file": "packages/web/src/pages/UserDetailPage.tsx"
+    },
+    {
+      "key": "link:pages/UsersPage.tsx#/users/:id",
+      "kind": "link",
+      "file": "packages/web/src/pages/UsersPage.tsx"
+    },
+    {
+      "key": "link:session.tsx#/login",
+      "kind": "link",
+      "file": "packages/web/src/session.tsx"
+    },
+    {
+      "key": "policy:api#/api/me",
+      "kind": "policy",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "policy:api#/api/overview",
+      "kind": "policy",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "policy:api#/api/requests",
+      "kind": "policy",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "policy:api#/api/requests/*",
+      "kind": "policy",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "policy:api#/api/users",
+      "kind": "policy",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "policy:api#/api/users/*",
+      "kind": "policy",
+      "file": "packages/app/src/app.ts"
+    },
+    {
+      "key": "policy:route#/",
+      "kind": "policy",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "policy:route#/requests",
+      "kind": "policy",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "policy:route#/requests/:id",
+      "kind": "policy",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "policy:route#/requests/new",
+      "kind": "policy",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "policy:route#/users",
+      "kind": "policy",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "policy:route#/users/:id",
+      "kind": "policy",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:*",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/login",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/requests",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/requests/:id",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/requests/new",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/users",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "route:/users/:id",
+      "kind": "route",
+      "file": "packages/web/src/App.tsx"
+    },
+    {
+      "key": "surface:components/AppShell.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/components/AppShell.tsx",
+      "handlers": 1
+    },
+    {
+      "key": "surface:components/UserMenu.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/components/UserMenu.tsx",
+      "handlers": 4
+    },
+    {
+      "key": "surface:pages/LoginPage.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/pages/LoginPage.tsx",
+      "handlers": 3
+    },
+    {
+      "key": "surface:pages/NewRequestPage.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/pages/NewRequestPage.tsx",
+      "handlers": 3
+    },
+    {
+      "key": "surface:pages/RequestDetailPage.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/pages/RequestDetailPage.tsx",
+      "handlers": 3
+    },
+    {
+      "key": "surface:pages/RequestsPage.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/pages/RequestsPage.tsx",
+      "handlers": 4
+    },
+    {
+      "key": "surface:pages/UserDetailPage.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/pages/UserDetailPage.tsx",
+      "handlers": 2
+    },
+    {
+      "key": "surface:pages/UsersPage.tsx",
+      "kind": "surface",
+      "file": "packages/web/src/pages/UsersPage.tsx",
+      "handlers": 7
+    }
+  ],
+  "clientWrites": [
+    {
+      "method": "createRequest",
+      "http": "POST",
+      "path": "/api/requests"
+    },
+    {
+      "method": "createUser",
+      "http": "POST",
+      "path": "/api/users"
+    },
+    {
+      "method": "decideRequest",
+      "http": "POST",
+      "path": "/api/requests/:p/decision"
+    },
+    {
+      "method": "deleteUser",
+      "http": "DELETE",
+      "path": "/api/users/:p"
+    },
+    {
+      "method": "login",
+      "http": "POST",
+      "path": "/api/login"
+    },
+    {
+      "method": "logout",
+      "http": "POST",
+      "path": "/api/logout"
+    },
+    {
+      "method": "submitRequest",
+      "http": "POST",
+      "path": "/api/requests/:p/submit"
+    },
+    {
+      "method": "updateStatus",
+      "http": "PATCH",
+      "path": "/api/users/:p/status"
+    }
+  ]
+}

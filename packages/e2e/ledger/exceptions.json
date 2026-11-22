@@ -1,0 +1,7 @@
+[
+  {
+    "key": "api:POST /api/logout",
+    "aspect": "invalid",
+    "reason": "入力を受け取らない API なので、不正な入力という状態が無い。"
+  }
+]

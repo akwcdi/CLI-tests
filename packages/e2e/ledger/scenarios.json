@@ -1,0 +1,394 @@
+[
+  {
+    "id": "AUTH-001",
+    "title": "未ログインで保護された画面を開くとログイン画面に飛ばされる",
+    "status": "implemented",
+    "roles": ["guest"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "denied"],
+    "covers": [
+      "link:session.tsx#/login",
+      "policy:route#/",
+      "policy:route#/users",
+      "policy:route#/users/:id",
+      "policy:route#/requests",
+      "policy:route#/requests/new",
+      "policy:route#/requests/:id"
+    ]
+  },
+  {
+    "id": "AUTH-002",
+    "title": "正しい資格情報でログインでき、開き直しても続いている",
+    "status": "implemented",
+    "roles": ["guest"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": [
+      "route:/login",
+      "flow:pages/LoginPage.tsx#op:handleSubmit",
+      "api:POST /api/login",
+      "link:pages/LoginPage.tsx#/"
+    ]
+  },
+  {
+    "id": "AUTH-003",
+    "title": "資格情報が違うと拒否され、セッションは作られない",
+    "status": "implemented",
+    "roles": ["guest"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": ["flow:pages/LoginPage.tsx#op:handleSubmit", "api:POST /api/login"]
+  },
+  {
+    "id": "AUTH-004",
+    "title": "ログアウトするとサーバー側でもセッションが切れる",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": [
+      "flow:components/UserMenu.tsx#ui:サインアウト",
+      "api:POST /api/logout",
+      "link:components/AppShell.tsx#/login"
+    ]
+  },
+  {
+    "id": "AUTH-005",
+    "title": "未ログインでは保護された API に届かない",
+    "status": "implemented",
+    "roles": ["guest"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["denied"],
+    "covers": [
+      "policy:api#/api/me",
+      "policy:api#/api/overview",
+      "policy:api#/api/users",
+      "policy:api#/api/users/*",
+      "policy:api#/api/requests",
+      "policy:api#/api/requests/*"
+    ]
+  },
+  {
+    "id": "AUTH-006",
+    "title": "停止中のユーザーはサインインできず、停止した時点でセッションも無効になる",
+    "status": "pending",
+    "pendingReason": "製品側が未実装。auth-repository.ts は利用停止で即座に無効化すると説明しているが、ログインもセッション照合も status を見ていない。テストを足すと落ちるので、製品の修正と同時に implemented にする。",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["denied"],
+    "covers": []
+  },
+  {
+    "id": "APP-001",
+    "title": "アプリトップから両方のアプリに入れる",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": [
+      "route:/",
+      "route:/users",
+      "route:/requests",
+      "link:pages/AppTopPage.tsx#/users",
+      "link:pages/AppTopPage.tsx#/requests"
+    ]
+  },
+  {
+    "id": "APP-002",
+    "title": "アプリトップの件数が登録と提出で増える",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["route:/"]
+  },
+  {
+    "id": "APP-003",
+    "title": "知らない URL はアプリトップへ戻す",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["route:*", "link:App.tsx#/"]
+  },
+  {
+    "id": "APP-004",
+    "title": "上部バーの製品名からアプリトップへ戻れる",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["link:components/AppShell.tsx#/"]
+  },
+  {
+    "id": "USER-001",
+    "title": "ユーザーメニューを開閉できる",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": [
+      "flow:components/UserMenu.tsx#op:setOpen",
+      "flow:components/UserMenu.tsx#op:handleKeyDown",
+      "flow:components/UserMenu.tsx#testid:usermenu-backdrop"
+    ]
+  },
+  {
+    "id": "USER-002",
+    "title": "メニューから自分の詳細に入れる",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["link:components/UserMenu.tsx#/users/:id", "route:/users/:id"]
+  },
+  {
+    "id": "USER-003",
+    "title": "一覧にシード済みのユーザーが並ぶ",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["route:/users"]
+  },
+  {
+    "id": "USER-004",
+    "title": "ユーザーを作成でき、開き直しても残り、履歴に記録される",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": [
+      "flow:pages/UsersPage.tsx#op:handleCreate",
+      "api:POST /api/users",
+      "link:pages/UsersPage.tsx#/users/:id"
+    ]
+  },
+  {
+    "id": "USER-005",
+    "title": "重複したメールは拒否され、行は増えない",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": ["flow:pages/UsersPage.tsx#op:handleCreate", "api:POST /api/users"]
+  },
+  {
+    "id": "USER-006",
+    "title": "不正な入力は理由が出て保存されない",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": ["flow:pages/UsersPage.tsx#op:handleCreate", "api:POST /api/users"]
+  },
+  {
+    "id": "USER-007",
+    "title": "停止でき、開き直しても残り、一覧と履歴に反映される",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": [
+      "flow:pages/UserDetailPage.tsx#ui:停止する|再開する",
+      "api:PATCH /api/users/:id/status",
+      "link:pages/UserDetailPage.tsx#/users"
+    ]
+  },
+  {
+    "id": "USER-008",
+    "title": "再開でき、開き直しても残る",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": [
+      "flow:pages/UserDetailPage.tsx#ui:停止する|再開する",
+      "api:PATCH /api/users/:id/status"
+    ]
+  },
+  {
+    "id": "USER-009",
+    "title": "同じ状態への変更は拒否され、履歴も増えない",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": [
+      "flow:pages/UserDetailPage.tsx#ui:停止する|再開する",
+      "api:PATCH /api/users/:id/status"
+    ]
+  },
+  {
+    "id": "USER-010",
+    "title": "削除すると一覧から消え、開き直しても戻らない",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": ["flow:pages/UserDetailPage.tsx#ui:削除する", "api:DELETE /api/users/:id"]
+  },
+  {
+    "id": "USER-011",
+    "title": "サインイン中の自分は削除できない",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": ["flow:pages/UserDetailPage.tsx#ui:削除する", "api:DELETE /api/users/:id"]
+  },
+  {
+    "id": "USER-012",
+    "title": "ユーザー一覧のページを行き来でき、重複しない",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": [
+      "flow:pages/UsersPage.tsx#ui:次へ",
+      "flow:pages/UsersPage.tsx#ui:前へ",
+      "flow:pages/UsersPage.tsx#ui:先頭へ"
+    ]
+  },
+  {
+    "id": "USER-013",
+    "title": "2 ページ目で作成すると先頭ページに戻る",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["flow:pages/UsersPage.tsx#op:handleCreate"]
+  },
+  {
+    "id": "USER-014",
+    "title": "存在しないユーザーの詳細は見つからない旨を出す",
+    "status": "implemented",
+    "roles": ["member"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["route:/users/:id", "link:pages/UserDetailPage.tsx#/users"]
+  },
+  {
+    "id": "REQ-001",
+    "title": "下書きを作れ、開き直しても残り、一覧と詳細を行き来できる",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": [
+      "route:/requests/new",
+      "route:/requests/:id",
+      "link:pages/RequestsPage.tsx#/requests/new",
+      "link:pages/RequestsPage.tsx#/requests/:id",
+      "link:pages/NewRequestPage.tsx#/requests/:id",
+      "link:pages/RequestDetailPage.tsx#/requests",
+      "flow:pages/NewRequestPage.tsx#op:handleSubmit",
+      "api:POST /api/requests"
+    ]
+  },
+  {
+    "id": "REQ-002",
+    "title": "不正な入力は理由が出て保存されない",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "invalid"],
+    "covers": [
+      "flow:pages/NewRequestPage.tsx#op:handleSubmit",
+      "api:POST /api/requests",
+      "link:pages/NewRequestPage.tsx#/requests"
+    ]
+  },
+  {
+    "id": "REQ-003",
+    "title": "提出すると承認待ちになり、開き直しても残る",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": ["flow:pages/RequestDetailPage.tsx#ui:承認へ回す", "api:POST /api/requests/:id/submit"]
+  },
+  {
+    "id": "REQ-004",
+    "title": "他人の下書きは提出できない",
+    "status": "implemented",
+    "roles": ["requester", "decider"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": ["flow:pages/RequestDetailPage.tsx#ui:承認へ回す", "api:POST /api/requests/:id/submit"]
+  },
+  {
+    "id": "REQ-005",
+    "title": "自分が出した申請は承認も却下もできない",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": [
+      "flow:pages/RequestDetailPage.tsx#ui:承認する",
+      "flow:pages/RequestDetailPage.tsx#ui:却下する",
+      "api:POST /api/requests/:id/decision"
+    ]
+  },
+  {
+    "id": "REQ-006",
+    "title": "別の担当者が承認でき、開き直しても両者に残る",
+    "status": "implemented",
+    "roles": ["requester", "decider"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": ["flow:pages/RequestDetailPage.tsx#ui:承認する", "api:POST /api/requests/:id/decision"]
+  },
+  {
+    "id": "REQ-007",
+    "title": "別の担当者が却下でき、開き直しても両者に残る",
+    "status": "implemented",
+    "roles": ["requester", "decider"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal", "persist"],
+    "covers": ["flow:pages/RequestDetailPage.tsx#ui:却下する", "api:POST /api/requests/:id/decision"]
+  },
+  {
+    "id": "REQ-008",
+    "title": "決裁済みの申請を古い画面から決裁し直しても結果は変わらない",
+    "status": "implemented",
+    "roles": ["decider"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["invalid"],
+    "covers": [
+      "flow:pages/RequestDetailPage.tsx#ui:却下する",
+      "api:POST /api/requests/:id/decision"
+    ]
+  },
+  {
+    "id": "REQ-009",
+    "title": "状態で絞り込める",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["flow:pages/RequestsPage.tsx#op:changeFilter"]
+  },
+  {
+    "id": "REQ-010",
+    "title": "申請一覧のページを行き来でき、重複しない",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": [
+      "flow:pages/RequestsPage.tsx#ui:次へ",
+      "flow:pages/RequestsPage.tsx#ui:前へ",
+      "flow:pages/RequestsPage.tsx#ui:先頭へ"
+    ]
+  },
+  {
+    "id": "REQ-011",
+    "title": "存在しない申請の詳細は見つからない旨を出す",
+    "status": "implemented",
+    "roles": ["requester"],
+    "viewports": ["pc", "mobile"],
+    "aspects": ["normal"],
+    "covers": ["route:/requests/:id", "link:pages/RequestDetailPage.tsx#/requests"]
+  }
+]

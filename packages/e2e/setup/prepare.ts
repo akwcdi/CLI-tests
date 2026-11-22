@@ -1,9 +1,10 @@
 /**
- * E2E の実行前に一度だけ走る下準備。
+ * E2E の前後に一度ずつ走る下準備と片付け。setup/run.ts から呼ぶ。
  *
  * Playwright の globalSetup ではなく手前の独立したステップにしてあるのは、
  * webServer（アプリ本体）が globalSetup より先に起動するため。
  * アプリが動き出したあとで DB を作り直すと、掴んでいる接続との競合になる。
+ * 片付けも同じ理由で、アプリが止まったあとに行う。
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -25,11 +26,39 @@ import { E2E_ENV, E2E_USER } from './env.ts';
 const exec = promisify(execFile);
 const COMPOSE_FILE = '../../docker/docker-compose.yml';
 
+const dynamoClient = (): DynamoDBClient =>
+  new DynamoDBClient({
+    region: E2E_ENV.AWS_REGION,
+    endpoint: E2E_ENV.LOCALSTACK_ENDPOINT,
+    credentials: {
+      accessKeyId: E2E_ENV.AWS_ACCESS_KEY_ID,
+      secretAccessKey: E2E_ENV.AWS_SECRET_ACCESS_KEY,
+    },
+  });
+
+async function dropDatabase(admin: Client): Promise<void> {
+  await admin.query(`DROP DATABASE IF EXISTS "${E2E_ENV.CID_TEST_DB_NAME}" WITH (FORCE)`);
+}
+
+/** テーブルがあれば消す。 */
+async function dropDynamoTable(client: DynamoDBClient): Promise<void> {
+  const TableName = E2E_ENV.EVENTS_TABLE_NAME;
+  try {
+    await client.send(new DescribeTableCommand({ TableName }));
+    await client.send(new DeleteTableCommand({ TableName }));
+    await waitUntilTableNotExists({ client, maxWaitTime: 30 }, { TableName });
+  } catch (error) {
+    if (!(error instanceof ResourceNotFoundException)) {
+      throw error;
+    }
+  }
+}
+
 async function resetDatabase(): Promise<void> {
   const admin = new Client({ connectionString: E2E_ENV.CID_ADMIN_DB_URL });
   await admin.connect();
   try {
-    await admin.query(`DROP DATABASE IF EXISTS "${E2E_ENV.CID_TEST_DB_NAME}" WITH (FORCE)`);
+    await dropDatabase(admin);
     await admin.query(`CREATE DATABASE "${E2E_ENV.CID_TEST_DB_NAME}"`);
   } finally {
     await admin.end();
@@ -52,26 +81,11 @@ async function resetDatabase(): Promise<void> {
 }
 
 async function resetDynamoTable(): Promise<void> {
-  const client = new DynamoDBClient({
-    region: E2E_ENV.AWS_REGION,
-    endpoint: E2E_ENV.LOCALSTACK_ENDPOINT,
-    credentials: {
-      accessKeyId: E2E_ENV.AWS_ACCESS_KEY_ID,
-      secretAccessKey: E2E_ENV.AWS_SECRET_ACCESS_KEY,
-    },
-  });
+  const client = dynamoClient();
   const TableName = E2E_ENV.EVENTS_TABLE_NAME;
 
   try {
-    try {
-      await client.send(new DescribeTableCommand({ TableName }));
-      await client.send(new DeleteTableCommand({ TableName }));
-      await waitUntilTableNotExists({ client, maxWaitTime: 30 }, { TableName });
-    } catch (error) {
-      if (!(error instanceof ResourceNotFoundException)) {
-        throw error;
-      }
-    }
+    await dropDynamoTable(client);
 
     await client.send(
       new CreateTableCommand({
@@ -125,15 +139,31 @@ async function seed(): Promise<void> {
   }
 }
 
-const startedAt = Date.now();
-try {
-  await resetDatabase();
-  await resetDynamoTable();
-  await seed();
-  console.log(`[e2e] prepared in ${Date.now() - startedAt}ms`);
-} catch (error) {
-  console.error(
-    'E2E の下準備に失敗しました。Docker が起動しているか確認してください（pnpm docker:up）。',
-  );
-  throw error;
+export async function prepare(): Promise<void> {
+  const startedAt = Date.now();
+  try {
+    await resetDatabase();
+    await resetDynamoTable();
+    await seed();
+    console.log(`[e2e] prepared ${E2E_ENV.CID_TEST_DB_NAME} in ${Date.now() - startedAt}ms`);
+  } catch (error) {
+    console.error(
+      'E2E の下準備に失敗しました。Docker が起動しているか確認してください（pnpm docker:up）。',
+    );
+    throw error;
+  }
+}
+
+/** この作業ツリーの DB とテーブルを消す。コンテナは他の作業と共用なので残す。 */
+export async function cleanup(): Promise<void> {
+  const admin = new Client({ connectionString: E2E_ENV.CID_ADMIN_DB_URL });
+  await admin.connect();
+  const client = dynamoClient();
+  try {
+    await dropDatabase(admin);
+    await dropDynamoTable(client);
+  } finally {
+    await admin.end();
+    client.destroy();
+  }
 }

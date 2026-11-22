@@ -1,0 +1,10 @@
+{
+  "components/AppShell.tsx": 1,
+  "components/UserMenu.tsx": 4,
+  "pages/LoginPage.tsx": 3,
+  "pages/NewRequestPage.tsx": 3,
+  "pages/RequestDetailPage.tsx": 3,
+  "pages/RequestsPage.tsx": 4,
+  "pages/UserDetailPage.tsx": 2,
+  "pages/UsersPage.tsx": 7
+}
