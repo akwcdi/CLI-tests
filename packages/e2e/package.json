@@ -4,8 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --experimental-strip-types setup/prepare.ts && playwright test",
-    "test:headed": "node --experimental-strip-types setup/prepare.ts && playwright test --headed",
+    "test": "node --experimental-strip-types setup/run.ts",
+    "test:headed": "node --experimental-strip-types setup/run.ts --headed",
+    "test:changed": "node --experimental-strip-types scripts/changed.ts",
+    "test:ledger": "vitest run",
+    "ledger": "node --experimental-strip-types scripts/ledger.ts",
+    "results": "node --experimental-strip-types scripts/results.ts",
     "report": "playwright show-report",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "install:browser": "playwright install --with-deps chromium"
@@ -18,6 +22,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
-    "@types/pg": "^8.11.10"
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.5"
   }
 }

@@ -20,20 +20,20 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
   timeout: 30_000,
   expect: { timeout: 5_000 },
-  // 全テストが1つの DB を共有するので、ファイル内は直列にする。
-  // 一覧やページングを見るテストが、別テストの作成・削除と競合するため。
-  // ファイル間は並列のままなので workers は効く。
+  // 全テストが1つの DB を共有するので直列にする。一覧やページングを見るテストが、
+  // 別テストの作成・削除と競合するため。同じ spec が PC とモバイルで走るので、
+  // ファイル間を並列にすると同じ一覧を同時に動かすことになる。
   fullyParallel: false,
-  forbidOnly: isCI,
+  workers: 1,
+  forbidOnly: true,
   retries: isCI ? 1 : 0,
-  workers: isCI ? 2 : undefined,
-  reporter: isCI
-    ? [
-        ['list'],
-        ['junit', { outputFile: '../../.test-result/e2e-junit.xml' }],
-        ['html', { open: 'never' }],
-      ]
-    : [['list'], ['html', { open: 'never' }]],
+  // JSON は scripts/results.ts が読む。スキップや未実施をここから数える。
+  reporter: [
+    ['list'],
+    ['json', { outputFile: '../../.test-result/e2e-results.json' }],
+    ['html', { open: 'never' }],
+    ...(isCI ? ([['junit', { outputFile: '../../.test-result/e2e-junit.xml' }]] as const) : []),
+  ],
   use: {
     baseURL: BASE_URL,
     storageState: STORAGE_STATE,
@@ -41,10 +41,15 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
+  // 名前はシナリオ台帳の viewports と揃える（ledger/scenarios.json）。
   projects: [
     {
-      name: 'chromium',
+      name: 'pc',
       use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
     },
   ],
   // API と SPA を同一オリジンで配信するアプリ本体を起動する。
@@ -53,7 +58,8 @@ export default defineConfig({
     ? {
         command: 'pnpm --filter @test/app start',
         url: `${BASE_URL}/api/health`,
-        reuseExistingServer: !isCI,
+        // 使い回すと、E2E の DB を見ていない別のアプリ（pnpm dev など）に繋がる。
+        reuseExistingServer: false,
         timeout: 60_000,
         env: { ...E2E_ENV, PORT: String(APP_PORT) },
       }
